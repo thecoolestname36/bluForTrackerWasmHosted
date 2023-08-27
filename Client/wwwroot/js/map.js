@@ -10,17 +10,14 @@ window.mapModule = {
     },
     init: function (ref) {
         window.mapModule.dotNetReference = ref;
-        window.mapModule.getCurrentLocation();
+        window.mapModule.dotNetReference.invokeMethodAsync('StartHubConnection');
     },
     getCurrentLocation: function () {
         navigator.geolocation.getCurrentPosition(function (position) {
-
-            console.log("getCurrentLocation - PositionCallback");
             window.mapModule.dotNetReference.invokeMethodAsync('PositionCallback', position.coords.latitude, position.coords.longitude);
         });
     },
     initMap: function (myLocation) {
-        
         if(window.mapModule.loading === false) {
             console.log("Init map", myLocation);
             window.mapModule.map = new google.maps.Map(document.getElementById("map"), {
@@ -32,10 +29,8 @@ window.mapModule = {
         } else {
             console.log("Init map - loading...", myLocation);
         }
-        //window.mapModule.dotNetReference.invokeMethodAsync('PostLocation', myLocation);
     },
     updateMap: function (newMarkers) {
-        console.log("update map", newMarkers);
         for(const key in newMarkers) {
             if(!window.mapModule.markers.hasOwnProperty(key)) {
                 const markerIcon = {
@@ -48,7 +43,6 @@ window.mapModule = {
                 };
 
                 window.mapModule.markers[key] = {
-                    staleCounter: newMarkers[key].staleCounter,
                     marker: new google.maps.Marker({
                         position: { lat: newMarkers[key].latitude, lng: newMarkers[key].longitude },
                         map: window.mapModule.map,
@@ -58,7 +52,7 @@ window.mapModule = {
             } else {
                 // update case
                 window.mapModule.markers[key].marker.setPosition({ lat: newMarkers[key].latitude, lng: newMarkers[key].longitude });
-                window.mapModule.markers[key].staleCounter = 0;
+                window.mapModule.markers[key].marker.setMap(window.mapModule.map)
             }
         }
         for(const key in window.mapModule.markers) {
