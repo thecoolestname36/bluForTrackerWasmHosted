@@ -52,7 +52,6 @@ window.mapModule = {
                     marker: new google.maps.Marker({
                         position: { lat: newMarkers[key].latitude, lng: newMarkers[key].longitude },
                         map: window.mapModule.map,
-                        title: newMarkers[key].Title,
                         icon: markerIcon
                     })
                 };

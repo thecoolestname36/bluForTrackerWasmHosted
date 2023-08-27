@@ -25,7 +25,9 @@
 
     Marker? _mapCenter = null;
 
-    ConcurrentDictionary<string, Marker?> _markers = new ConcurrentDictionary<string, Marker?>();
+    Guid MarkerId = Guid.NewGuid();
+
+    ConcurrentDictionary<Guid, Marker> _markers = new ConcurrentDictionary<Guid, Marker>();
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -44,9 +46,9 @@
     {
         var marker = new Marker
             {
+                Id = MarkerId,
                 Latitude = lat,
                 Longitude = lon,
-                Title = "My Location",
                 Color = Color
             };
         if(_mapCenter == null)
@@ -60,7 +62,7 @@
                 .WithUrl(FullPath)
                 .Build();
             await _hubConnection.StartAsync();
-            _hubConnection.On<string, Marker>("NotifyLocation", ReceiveLocation);
+            _hubConnection.On<DateTimeOffset, Marker>("NotifyLocation", ReceiveLocation);
         }
         while(_hubConnection.State != HubConnectionState.Connected)
         {
@@ -72,12 +74,12 @@
         await JSRuntime.InvokeVoidAsync("mapModule.getCurrentLocation");
     }
 
-    async Task ReceiveLocation(string connectionId, Marker? marker)
+    async Task ReceiveLocation(DateTimeOffset serverNow, Marker marker)
     {
-        _markers[connectionId] = marker;
+        _markers[marker.Id] = marker;
         foreach(var item in _markers)
         {
-            if(item.Value == null || (DateTimeOffset.UtcNow - item.Value.UpdatedOn).TotalSeconds > 30)
+            if(item.Value == null || (serverNow - item.Value.UpdatedOn).TotalSeconds > 30)
             {
                 _markers.Remove(item.Key, out _);
                 continue;
