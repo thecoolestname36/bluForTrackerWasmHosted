@@ -47,23 +47,20 @@ window.mapModule = {
                     scale: 1
                 };
 
-                window.mapModule.markers[key] = {
-                    staleCounter: newMarkers[key].staleCounter,
-                    marker: new google.maps.Marker({
-                        position: { lat: newMarkers[key].latitude, lng: newMarkers[key].longitude },
-                        map: window.mapModule.map,
-                        icon: markerIcon
-                    })
-                };
+                window.mapModule.markers[key] = new google.maps.Marker({
+                    position: { lat: newMarkers[key].latitude, lng: newMarkers[key].longitude },
+                    map: window.mapModule.map,
+                    icon: markerIcon
+                });
             } else {
                 // update case
-                window.mapModule.markers[key].marker.setPosition({ lat: newMarkers[key].latitude, lng: newMarkers[key].longitude });
-                window.mapModule.markers[key].staleCounter = 0;
+                window.mapModule.markers[key].setPosition({ lat: newMarkers[key].latitude, lng: newMarkers[key].longitude });
+                window.mapModule.markers[key].setMap(window.mapModule.map);
             }
         }
         for(const key in window.mapModule.markers) {
             if(!newMarkers.hasOwnProperty(key)) {
-                window.mapModule.markers[key].marker.setMap(null);
+                window.mapModule.markers[key].setMap(null);
                 delete window.mapModule.markers[key];
             }
         }
