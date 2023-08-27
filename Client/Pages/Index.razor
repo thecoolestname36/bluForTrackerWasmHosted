@@ -1,0 +1,23 @@
+﻿@page "/"
+@inject NavigationManager NavManager
+
+<PageTitle>Index</PageTitle>
+Pick Marker Color:
+<input type="color" @bind="SelectedColor" />
+<br/>
+@if(!string.IsNullOrEmpty(SelectedColor))
+{
+    <div>
+        Selected color: <span style="color: @SelectedColor">@SelectedColor</span>
+    </div>
+}
+<br/>
+Go To Map:
+<input type="button" value="Map" @onclick=NavigateToMap />
+
+@code {
+    private string SelectedColor { get; set; } = "#000000";
+
+    void NavigateToMap() => NavManager.NavigateTo($"/map/{Uri.EscapeDataString(SelectedColor)}");
+
+}
