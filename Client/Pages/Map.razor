@@ -25,9 +25,9 @@
 
     Marker? _mapCenter = null;
 
-    Guid MarkerId = Guid.NewGuid();
+    string MarkerId = $"{Guid.NewGuid()}-{DateTimeOffset.UtcNow:O}";
 
-    ConcurrentDictionary<Guid, Marker> _markers = new ConcurrentDictionary<Guid, Marker>();
+    ConcurrentDictionary<string, Marker> _markers = new ConcurrentDictionary<string, Marker>();
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -68,6 +68,7 @@
         {
             await Task.Delay(TimeSpan.FromSeconds(1)); // Delay for 1 second
         }
+
         await _hubConnection.SendAsync("BroadcastLocation", marker);
 
         await Task.Delay(TimeSpan.FromSeconds(1)); // Delay for 1 second
