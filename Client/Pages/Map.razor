@@ -25,7 +25,7 @@
 
     Marker? _mapCenter = null;
 
-    string? _connectionId;
+    string MarkerId = $"{Guid.NewGuid()}-{DateTimeOffset.UtcNow:O}";
 
     ConcurrentDictionary<string, Marker> _markers = new ConcurrentDictionary<string, Marker>();
 
@@ -42,37 +42,11 @@
     }
 
     [JSInvokable]
-    public async Task StartHubConnection()
-    {
-        if (_hubConnection != null)
-        {
-            await _hubConnection.DisposeAsync();    
-        }
-        _hubConnection = new HubConnectionBuilder()
-                .WithUrl(FullPath)
-                .Build();
-        _hubConnection.On<string>("UserConnectedCallback", OnUserConnectedCallback);
-        _hubConnection.On<DateTimeOffset, Marker>("NotifyLocation", OnReceiveLocation);
-        await _hubConnection.StartAsync();
-        while(_hubConnection.State != HubConnectionState.Connected)
-        {
-            await Task.Delay(TimeSpan.FromSeconds(1)); // Delay for 1 second
-        }
-        await _hubConnection.SendAsync("UserConnected");
-    }
-
-    async Task OnUserConnectedCallback(string connectionId)
-    {
-        _connectionId = connectionId;
-        await JSRuntime.InvokeVoidAsync("mapModule.getCurrentLocation");
-    }
-
-    [JSInvokable]
     public async Task PositionCallback(double lat, double lon)
     {
         var marker = new Marker
             {
-                Id = _connectionId ?? Guid.NewGuid().ToString(),
+                Id = MarkerId,
                 Latitude = lat,
                 Longitude = lon,
                 Color = Color
@@ -82,19 +56,26 @@
             await JSRuntime.InvokeVoidAsync("mapModule.initMap", marker);
             _mapCenter = marker;
         }
-        if (_hubConnection == null || _hubConnection.State != HubConnectionState.Connected)
+        if(_hubConnection == null || _hubConnection.State == HubConnectionState.Disconnected)
         {
-            await JSRuntime.InvokeVoidAsync("mapModule.init", DotNetObjectReference.Create(this));
+            _hubConnection = new HubConnectionBuilder()
+                .WithUrl(FullPath)
+                .Build();
+            await _hubConnection.StartAsync();
+            _hubConnection.On<DateTimeOffset, Marker>("NotifyLocation", ReceiveLocation);
         }
-        else
+        while(_hubConnection.State != HubConnectionState.Connected)
         {
-            await _hubConnection.SendAsync("BroadcastLocation", marker);
             await Task.Delay(TimeSpan.FromSeconds(1)); // Delay for 1 second
-            await JSRuntime.InvokeVoidAsync("mapModule.getCurrentLocation");
         }
+
+        await _hubConnection.SendAsync("BroadcastLocation", marker);
+
+        await Task.Delay(TimeSpan.FromSeconds(1)); // Delay for 1 second
+        await JSRuntime.InvokeVoidAsync("mapModule.getCurrentLocation");
     }
 
-    async Task OnReceiveLocation(DateTimeOffset serverNow, Marker marker)
+    async Task ReceiveLocation(DateTimeOffset serverNow, Marker marker)
     {
         _markers[marker.Id] = marker;
         foreach(var item in _markers)
