@@ -26,5 +26,8 @@ public class LocationHub : Hub
         await Clients.All.SendAsync("NotifyLocation", new Dictionary<string, Marker>(Markers));
     }
 
-    public void RemoveMarker(string key) => Markers.TryRemove(key, out _);
+    public async Task RemoveMarker(string key) {
+        Markers.TryRemove(key, out _);
+        await Clients.All.SendAsync("NotifyLocation", new Dictionary<string, Marker>(Markers));
+    }
 }
