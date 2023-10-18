@@ -5,8 +5,41 @@
 @implements IAsyncDisposable
 
 <PageTitle>Map</PageTitle>
-
-<div id="map"></div>
+@if (string.IsNullOrEmpty(_error))
+{
+    <div id="map-container">
+        <div id="map"></div>
+        <div id="map-player-box">
+            <table class="tableScrollable">
+                <thead>
+                    <tr>
+                        <th>Icon</th>
+                        <th>Last Reported At</th>
+                        <th>Remove Icon</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach(var item in _markers)
+                    {
+                        <tr>
+                            <td style="background-color:@item.Value.Color">
+                            </td>
+                            <td>
+                                @MakeLastReportedAt(item.Value.UpdatedOn)
+                            </td>
+                            <td>
+                                <button @onclick="() => RemoveMarker(item.Key)">REMOVE</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+} else
+{
+    <div id="error-box">@_error</div>
+}
 
 @code {
 
@@ -19,74 +52,86 @@
     [Parameter]
     public string Color { get; set; } = "#ffffff";
 
+    string? _error = null;
+
     Uri FullPath;
 
     HubConnection? _hubConnection;
 
-    Marker? _mapCenter = null;
-
-    string MarkerId = $"{Guid.NewGuid()}-{DateTimeOffset.UtcNow:O}";
-
-    ConcurrentDictionary<string, Marker> _markers = new ConcurrentDictionary<string, Marker>();
+    Dictionary<string, Marker> _markers = new Dictionary<string, Marker>();
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         await base.OnAfterRenderAsync(firstRender);
-        var builder = new UriBuilder(NavManager.BaseUri);
-        builder.Path += "hubs/location";
-        FullPath = builder.Uri;
         if(firstRender)
         {
-            await JSRuntime.InvokeVoidAsync("mapModule.init", DotNetObjectReference.Create(this));
+            _error = null;
+            var builder = new UriBuilder(NavManager.BaseUri);
+            builder.Path += "hubs/location";
+            FullPath = builder.Uri;
+            await JSRuntime.InvokeVoidAsync("mapModule.watchPosition", DotNetObjectReference.Create(this));
         }
     }
 
     [JSInvokable]
-    public async Task PositionCallback(double lat, double lon)
+    public void WatchPositionErrorCallback()
     {
-        var marker = new Marker
-            {
-                Id = MarkerId,
-                Latitude = lat,
-                Longitude = lon,
-                Color = Color
-            };
-        if(_mapCenter == null)
-        {
-            await JSRuntime.InvokeVoidAsync("mapModule.initMap", marker);
-            _mapCenter = marker;
-        }
+        NavManager.NavigateTo("/");
+    }
+
+    [JSInvokable]
+    public async Task SendPosition(double lat, double lng)
+    {
         if(_hubConnection == null || _hubConnection.State == HubConnectionState.Disconnected)
         {
             _hubConnection = new HubConnectionBuilder()
                 .WithUrl(FullPath)
                 .Build();
             await _hubConnection.StartAsync();
-            _hubConnection.On<DateTimeOffset, Marker>("NotifyLocation", ReceiveLocation);
+            _hubConnection.On<Dictionary<string, Marker>>("NotifyLocation", ReceiveLocation);
         }
         while(_hubConnection.State != HubConnectionState.Connected)
         {
             await Task.Delay(TimeSpan.FromSeconds(1)); // Delay for 1 second
         }
-
-        await _hubConnection.SendAsync("BroadcastLocation", marker);
+        await _hubConnection.SendAsync("BroadcastLocation", new Marker {
+                Latitude = lat,
+                Longitude = lng,
+                Color = Color
+            });
 
         await Task.Delay(TimeSpan.FromSeconds(1)); // Delay for 1 second
-        await JSRuntime.InvokeVoidAsync("mapModule.getCurrentLocation");
+        await JSRuntime.InvokeVoidAsync("mapModule.doneSendingPosition");
     }
 
-    async Task ReceiveLocation(DateTimeOffset serverNow, Marker marker)
+    async Task RemoveMarker(string key)
     {
-        _markers[marker.Id] = marker;
-        foreach(var item in _markers)
+        if (_hubConnection != null && _hubConnection.State == HubConnectionState.Connected)
         {
-            if(item.Value == null || (serverNow - item.Value.UpdatedOn).TotalSeconds > 30)
-            {
-                _markers.Remove(item.Key, out _);
-                continue;
-            }
+            await _hubConnection.SendAsync("RemoveMarker", key);
+        }    
+    }
+
+    async Task ReceiveLocation(Dictionary<string, Marker> markers)
+    {
+        _markers = markers;
+        StateHasChanged();
+        await JSRuntime.InvokeVoidAsync("mapModule.updateMap", markers);
+    }
+
+    string MakeLastReportedAt(DateTimeOffset updatedOn)
+    {
+        var timestamp = updatedOn.ToLocalTime().ToString("h:mm:ss t");
+        var ageSeconds = (DateTimeOffset.UtcNow - updatedOn).TotalSeconds;
+        if (ageSeconds > 60)
+        {
+            return $"{timestamp} (Age: {(int)(DateTimeOffset.UtcNow - updatedOn).TotalMinutes} minutes)";
         }
-        await JSRuntime.InvokeVoidAsync("mapModule.updateMap", _markers);
+        else if (ageSeconds > 15)
+        {
+            return $"{timestamp} (Age: {(int)ageSeconds} seconds)";
+        }
+        return timestamp;
     }
 
     #region disposal

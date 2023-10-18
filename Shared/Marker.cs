@@ -1,8 +1,8 @@
 ﻿namespace BluForTracker.Shared;
 
-public class Marker
+public record Marker
 {
-    public required string Id { get; set; }
+    public string Id { get; set; } = "unk";
     public DateTimeOffset UpdatedOn { get; set; } = DateTimeOffset.MinValue;
     public double Latitude { get; set; }
     public double Longitude { get; set; }

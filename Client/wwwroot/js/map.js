@@ -2,40 +2,55 @@
 window.mapModule = {
     markers: [],
     map: null, // This property will hold the map instance
-    loading: true, 
+    loading: true,
     dotNetReference: null,
+    sendingPosition: false,
+    sendPositionDebounce: null,
+    enableHighAccuracy: true,
     mapsCallback: function () {
-        console.log("MapsCallback");
         window.mapModule.loading = false;
     },
-    init: function (ref) {
+    watchPosition: function (ref) {
+        console.log("watchPosition");
         window.mapModule.dotNetReference = ref;
-        window.mapModule.getCurrentLocation();
-    },
-    getCurrentLocation: function () {
-        navigator.geolocation.getCurrentPosition(function (position) {
-
-            console.log("getCurrentLocation - PositionCallback");
-            window.mapModule.dotNetReference.invokeMethodAsync('PositionCallback', position.coords.latitude, position.coords.longitude);
+        window.mapModule.positionWatch = navigator.geolocation.watchPosition(function (position) {
+            if(window.mapModule.sendPositionDebounce !== null) return;
+            window.mapModule.sendPositionDebounce = setTimeout(() => {
+                if(window.mapModule.loading === true) {
+                    console.log("watchPosition - loading...");
+                    return;
+                }
+                if(window.mapModule.map === null) {
+                    console.log("watchPosition - init map");
+                    window.mapModule.map = new google.maps.Map(document.getElementById("map"), {
+                        zoom: 16,
+                        center: { lat: position.coords.latitude, lng: position.coords.longitude },
+                        mapTypeId: 'terrain'
+                    });
+                }
+                if(window.mapModule.sendingPosition === true) {
+                    console.log("watchPosition - SendingPosition...")
+                    return;
+                }
+                window.mapModule.sendingPosition = true;
+                console.log("watchPosition - SendPosition");
+                window.mapModule.dotNetReference.invokeMethodAsync("SendPosition", position.coords.latitude, position.coords.longitude);
+                window.mapModule.sendPositionDebounce = null;
+            }, 250);
+        }, function (error) {
+            console.error(`ERROR(${error.code}): ${error.message}`);
+            window.mapModule.enableHighAccuracy = false;
+            window.mapModule.dotNetReference.invokeMethodAsync("WatchPositionErrorCallback");
+        }, {
+            enableHighAccuracy: window.mapModule.enableHighAccuracy
         });
     },
-    initMap: function (myLocation) {
-        
-        if(window.mapModule.loading === false) {
-            console.log("Init map", myLocation);
-            window.mapModule.map = new google.maps.Map(document.getElementById("map"), {
-                zoom: 16,
-                center: { lat: myLocation.latitude, lng: myLocation.longitude },
-                mapTypeId: 'terrain'
-            });
-            console.log("Init map - done", myLocation);
-        } else {
-            console.log("Init map - loading...", myLocation);
-        }
-        //window.mapModule.dotNetReference.invokeMethodAsync('PostLocation', myLocation);
+    doneSendingPosition: function () {
+        console.log("doneSendingPosition");
+        window.mapModule.sendingPosition = false;
     },
     updateMap: function (newMarkers) {
-        console.log("update map", newMarkers);
+        console.log("updateMap", newMarkers);
         for(const key in newMarkers) {
             if(!window.mapModule.markers.hasOwnProperty(key)) {
                 const markerIcon = {
@@ -64,6 +79,5 @@ window.mapModule = {
                 delete window.mapModule.markers[key];
             }
         }
-
     }
 };

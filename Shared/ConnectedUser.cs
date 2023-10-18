@@ -1,12 +1,12 @@
 ﻿namespace BluForTracker.Shared;
-public class ConnectedUser
+public record ConnectedUser
 {
     public string Name { get; set; }
     public string UserIdentifier { get; set; }
 
     public List<Connection> Connections { get; set; }
 }
-public class Connection
+public record Connection
 {
     public string ConnectionID { get; set; }
 
