@@ -15,6 +15,10 @@ Pick Marker Color:
 Go To Map:
 <input type="button" value="Map" @onclick=NavigateToMap />
 
+<div style="text-align:center;">
+    <img style="width:65%" @onclick=NavigateToMap src="images/qr-code.svg" />
+</div>
+
 @code {
     private string SelectedColor { get; set; } = "#000000";
 
