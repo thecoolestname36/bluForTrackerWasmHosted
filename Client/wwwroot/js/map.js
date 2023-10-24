@@ -2,41 +2,41 @@
 window.mapModule = {
     markers: [],
     map: null, // This property will hold the map instance
-    loading: true,
     dotNetReference: null,
-    sendingPosition: false,
-    enableHighAccuracy: true,
+    firstLoad: true,
+    isLoading: function () {
+        return window.mapModule.loading;
+    },
     mapsCallback: function () {
+        console.log("mapsCallback");
         window.mapModule.loading = false;
     },
-    getCurrentPosition: function (ref) {
+    addListenerOnceMapIdle: function (ref) {
+        console.log("addListenerOnceMapIdle");
         window.mapModule.dotNetReference = ref;
-        navigator.geolocation.getCurrentPosition(function (position) {
-            if(window.mapModule.loading === true) {
-                console.log("watchPosition - loading...");
-                return;
-            }
-            if(window.mapModule.map === null) {
-                console.log("watchPosition - init map");
-                window.mapModule.map = new google.maps.Map(document.getElementById("map"), {
-                    zoom: 16,
-                    center: { lat: position.coords.latitude, lng: position.coords.longitude },
-                    mapTypeId: 'terrain'
-                });
-            }
-            if(window.mapModule.sendingPosition === true) {
-                console.log("watchPosition - SendingPosition...")
-                return;
-            }
-            window.mapModule.sendingPosition = true;
-            console.log("watchPosition - SendPosition");
-            window.mapModule.dotNetReference.invokeMethodAsync("SendPosition", position.coords.latitude, position.coords.longitude);
-            window.mapModule.sendPositionDebounce = null;
+        window.mapModule.map = new google.maps.Map(document.getElementById("map"), {
+            zoom: 5,
+            center: { lat: 36.0, lng: -98.0 },
+            mapTypeId: 'terrain'
+        });
+        google.maps.event.addListenerOnce(window.mapModule.map, 'idle', function () {
+            console.log("addListenerOnceMapIdle - fired");
+            window.mapModule.watchPosition();
         });
     },
-    doneSendingPosition: function () {
-        console.log("doneSendingPosition");
-        window.mapModule.sendingPosition = false;
+    watchPosition: function () {
+        console.log("watchPosition");
+        window.mapModule.positionWatch = navigator.geolocation.watchPosition(function (position) {
+            if(window.mapModule.firstLoad) {
+                window.mapModule.firstLoad = false;
+                window.mapModule.setCenter(position.coords.latitude, position.coords.longitude);
+            }
+            window.mapModule.dotNetReference.invokeMethodAsync("UpdateCurrentPosition", position.coords.latitude, position.coords.longitude);
+        }, function (error) {
+            console.error(`ERROR(${error.code}): ${error.message}`);
+        }, {
+            enableHighAccuracy: true
+        });
     },
     updateMap: function (newMarkers) {
         console.log("updateMap");

@@ -8,11 +8,11 @@
 @implements IAsyncDisposable
 
 <PageTitle>Map</PageTitle>
-@if (string.IsNullOrEmpty(_error))
-{
-    <div id="map-container">
-        <div id="map"></div>
-        <div id="map-player-box">
+<div id="map-container">
+    <div id="map"></div>
+    <div id="map-player-box">
+        @if (_hubConnection?.State == HubConnectionState.Connected)
+        {
             <table class="tableScrollable">
                 <thead>
                     <tr>
@@ -23,26 +23,32 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach(var item in _markers)
+                    @foreach (var item in _markers)
                     {
                         <tr style="cursor:pointer; box-shadow:0px -16px 32px inset @item.Value.Color">
                             <td @onclick="async () => await SetCenter(item.Value)">@item.Value.Label</td>
                             <td @onclick="async () => await SetCenter(item.Value)">@(item.Value.Connected ? "Connected" : "Disconnected")</td>
-                            <td @onclick="async () => await SetCenter(item.Value)">@MakeLastReportedAt(item.Value.UpdatedOn)</td>
-                            <td><button @onclick="async () => await RemoveMarker(item.Value.Id)">REMOVE</button></td>
-                        </tr>
-                    }
-                </tbody>
+                            @{
+                                var age = "";
+                                var diff = DateTimeOffset.UtcNow - item.Value.UpdatedOn;
+                                if (diff.TotalSeconds >= 15)
+                                {
+                                    age = new DateTime(diff.Ticks).ToString("m:ss");
+                                }
+                            }
+                            <td @onclick="async () => await SetCenter(item.Value)">@age</td>
+                        <td><button @onclick="async () => await RemoveMarker(item.Value.Id)">REMOVE</button></td>
+                    </tr>
+                }
+            </tbody>
             </table>
-        </div>
-        <div id="reportLocationButton">
-            <button @onclick="ReportLocation">Report Location</button>
-        </div>
+        } else
+        {
+            <div class="alert alert-danger" role="alert">@(_hubConnection?.State.ToString() ?? "No hub connection")</div>
+        }
     </div>
-} else
-{
-    <div id="error-box">@_error</div>
-}
+</div>
+
 
 @code {
 
@@ -56,14 +62,17 @@
     public required string FormData { get; set; }
 
     Index.MarkerFormModel? _formData = null;
-
     string? _error = null;
-
     HubConnection? _hubConnection;
-
-    Timer? _renderTimer;
-
     ConcurrentDictionary<string, Marker> _markers = new();
+
+    struct GeolocationCoordinates
+    {
+        public double Latitude { get; init; } 
+        public double Longitude { get; init; }
+    }
+
+    GeolocationCoordinates? _currentLocation;
 
     protected override void OnParametersSet()
     {
@@ -86,20 +95,78 @@
 
         if(firstRender)
         {
-            _error = null;
-            await JSRuntime.InvokeVoidAsync("mapModule.getCurrentPosition", DotNetObjectReference.Create(this));
-            _renderTimer = new Timer(callback: new TimerCallback(async (state) =>
-            {
-                if(state is Map map)
-                {
-                    map.StateHasChanged();
-                    await map.GetHubConnection();
-                }
-            }), this, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+            ViewRenderLoop();
+            SendLocationLoop();
+            await MapLoadLoop();
+            await JSRuntime.InvokeVoidAsync("mapModule.addListenerOnceMapIdle", DotNetObjectReference.Create(this));
         }
     }
 
-    async Task ReportLocation() => await JSRuntime.InvokeVoidAsync("mapModule.getCurrentPosition", DotNetObjectReference.Create(this));
+    PeriodicTimer? _viewRenderTimer;
+    async void ViewRenderLoop()
+    {
+        _viewRenderTimer ??= new(TimeSpan.FromSeconds(1));
+        while (await _viewRenderTimer.WaitForNextTickAsync())
+        {
+            StateHasChanged();
+        }
+    }
+
+    PeriodicTimer? _mapLoadTimer;
+    async Task MapLoadLoop()
+    {
+        _mapLoadTimer ??= new(TimeSpan.FromMilliseconds(250));
+        while (await _mapLoadTimer.WaitForNextTickAsync())
+        {
+            if (!(await JSRuntime.InvokeAsync<bool>("window.mapModule.isLoading")))
+            {
+                _mapLoadTimer.Dispose();
+                return;
+            }
+        }
+    }
+
+    PeriodicTimer? _sendLocationTimer;
+    async void SendLocationLoop()
+    {
+        _sendLocationTimer ??= new(TimeSpan.FromSeconds(1));
+        while(await _sendLocationTimer.WaitForNextTickAsync())
+        {
+            var hubConnection = await GetHubConnection();
+            if(hubConnection.State == HubConnectionState.Connected && _currentLocation.HasValue)
+            {
+                var lat = _currentLocation.Value.Latitude;
+                var lng = _currentLocation.Value.Longitude;
+                _currentLocation = null;
+                await hubConnection.SendAsync(Routing.MarkerHub.Server.BroadcastMarker, new Marker
+                    {
+                        Latitude = lat,
+                        Longitude = lng,
+                        Label = _formData?.Label ?? "",
+                        Color = _formData?.Color ?? "#000000",
+                        Connected = true
+                    });
+            }
+        }
+    }
+
+    [JSInvokable]
+    public void UpdateCurrentPosition(double lat, double lng) => _currentLocation = new GeolocationCoordinates
+    {
+        Latitude = lat,
+        Longitude = lng
+    };    
+
+    async Task RemoveMarker(string key)
+    {
+        var hubConnection = await GetHubConnection();
+        if(hubConnection.State == HubConnectionState.Connected)
+        {
+            await hubConnection.SendAsync(Routing.MarkerHub.Server.RemoveMarker, key);
+        }
+    }
+
+    async Task SetCenter(Marker marker) => await JSRuntime.InvokeVoidAsync("mapModule.setCenter", marker.Latitude, marker.Longitude);
 
     public async Task<HubConnection> GetHubConnection()
     {
@@ -110,6 +177,7 @@
             _hubConnection = new HubConnectionBuilder()
                 .WithUrl(builder.Uri)
                 .Build();
+            _hubConnection.ServerTimeout = TimeSpan.FromSeconds(60);
             _hubConnection.On<ConcurrentDictionary<string, Marker>>(Routing.MarkerHub.Client.ReceiveMarkers, async (markers) =>
             {
                 _markers = markers;
@@ -141,53 +209,6 @@
         return _hubConnection;
     }
 
-    async Task RemoveMarker(string key)
-    {
-        var hubConnection = await GetHubConnection();
-        if (hubConnection.State == HubConnectionState.Connected)
-        {
-            await hubConnection.SendAsync(Routing.MarkerHub.Server.RemoveMarker, key);
-        }
-    }
-
-    [JSInvokable]
-    public void WatchPositionErrorCallback()
-    {
-        NavManager.NavigateTo("/");
-    }
-
-    [JSInvokable]
-    public async Task SendPosition(double lat, double lng)
-    {
-        var hubConnection = await GetHubConnection();
-        if (hubConnection.State == HubConnectionState.Connected)
-        {
-            await hubConnection.SendAsync(Routing.MarkerHub.Server.BroadcastMarker, new Marker
-             {
-                 Latitude = lat,
-                 Longitude = lng,
-                 Label = _formData?.Label ?? "",
-                 Color = _formData?.Color ?? "#000000",
-                 Connected = true
-             });
-            await Task.Delay(TimeSpan.FromSeconds(1)); // Delay for 1 second
-            await JSRuntime.InvokeVoidAsync("mapModule.doneSendingPosition");
-        }
-    }
-
-    string MakeLastReportedAt(DateTimeOffset updatedOn)
-    {
-
-        var diff = DateTimeOffset.UtcNow - updatedOn;
-        if (diff.TotalSeconds >= 15)
-        {
-            return new DateTime(diff.Ticks).ToString("m:ss");
-        }
-        return "";
-    }
-
-    async Task SetCenter(Marker marker) => await JSRuntime.InvokeVoidAsync("mapModule.setCenter", marker.Latitude, marker.Longitude);
-
     #region disposal
 
     public async ValueTask DisposeAsync()
@@ -196,6 +217,9 @@
         {
             await _hubConnection.DisposeAsync();
         }
+        _viewRenderTimer?.Dispose();
+        _mapLoadTimer?.Dispose();
+        _sendLocationTimer?.Dispose();
     }
 
     #endregion
