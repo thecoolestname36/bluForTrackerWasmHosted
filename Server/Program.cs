@@ -1,5 +1,6 @@
-using BluForTracker.Server;
 using Microsoft.AspNetCore.ResponseCompression;
+using BluForTracker.Shared;
+using BluForTracker.Server;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -33,7 +34,7 @@ app.UseRouting();
 
 app.MapRazorPages();
 app.MapControllers();
-app.MapHub<LocationHub>("/hubs/location");
+app.MapHub<MarkerHub>(Routing.MarkerHub.Path);
 app.MapFallbackToFile("index.html");
 
 app.Run();

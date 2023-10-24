@@ -1,27 +1,50 @@
 ﻿@page "/"
+@using System.Text
+@using System.Text.Json
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Components.Forms
 @inject NavigationManager NavManager
 
 <PageTitle>Index</PageTitle>
-Pick Marker Color:
-<input type="color" @bind="SelectedColor" />
-<br/>
-@if(!string.IsNullOrEmpty(SelectedColor))
-{
-    <div>
-        Selected color: <span style="color: @SelectedColor">@SelectedColor</span>
-    </div>
-}
-<br/>
-Go To Map:
-<input type="button" value="Map" @onclick=NavigateToMap />
+
+<div class="container">
+    <h2>Edit Form</h2>
+
+    <EditForm Model="@_formData" OnValidSubmit="OnSubmit">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div class="form-group">
+            <label for="label">Username (Max @MarkerFormModel.LabelMaxChars characters):</label>
+            <InputText @bind-Value="_formData.Label" class="form-control required" id="label" />
+            <ValidationMessage For="@(() => _formData.Label)" />
+        </div>
+
+        <div class="form-group">
+            <label for="color">Color:</label>
+            <input type="color" @bind="_formData.Color" id="color" />
+        </div>
+
+        <button type="submit" class="btn btn-primary">Submit</button>
+    </EditForm>
+</div>
 
 <div style="text-align:center;">
-    <img style="width:65%" @onclick=NavigateToMap src="images/qr-code.svg" />
+    <img style="width:65%;max-width:400px;" src="images/qr-code.svg" />
 </div>
 
 @code {
-    private string SelectedColor { get; set; } = "#000000";
 
-    void NavigateToMap() => NavManager.NavigateTo($"/map/{Uri.EscapeDataString(SelectedColor)}");
+    private MarkerFormModel _formData = new();
 
+    public class MarkerFormModel
+    {
+        public const int LabelMaxChars = 28;
+        [StringLength(LabelMaxChars, ErrorMessage = "Label must be 28 characters or less.")]
+        public string Label { get; set; } = "";
+        [RegularExpression("^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$", ErrorMessage = "Invalid Format")]
+        public string Color { get; set; } = "#000000";
+    }
+
+    private void OnSubmit() => NavManager.NavigateTo($"/map/{Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(_formData)))}");
 }

@@ -50,7 +50,7 @@ window.mapModule = {
         window.mapModule.sendingPosition = false;
     },
     updateMap: function (newMarkers) {
-        console.log("updateMap", newMarkers);
+        console.log("updateMap");
         for(const key in newMarkers) {
             if(!window.mapModule.markers.hasOwnProperty(key)) {
                 const markerIcon = {
@@ -59,13 +59,18 @@ window.mapModule = {
                     fillOpacity: 1,
                     strokeColor: '#000000', // Stroke color in hex format
                     strokeWeight: 2,
-                    scale: 1
+                    scale: 1,
+                    labelOrigin: new google.maps.Point(0, 18)
                 };
 
                 window.mapModule.markers[key] = new google.maps.Marker({
                     position: { lat: newMarkers[key].latitude, lng: newMarkers[key].longitude },
                     map: window.mapModule.map,
-                    icon: markerIcon
+                    icon: markerIcon,
+                    label: newMarkers[key].label,
+                    fontSize: "26px",
+                    fontWeight: "bold"
+                    
                 });
             } else {
                 // update case
@@ -79,5 +84,9 @@ window.mapModule = {
                 delete window.mapModule.markers[key];
             }
         }
+    },
+    setCenter: function (lat, lng) {
+        window.mapModule.map.setCenter({ lat: lat, lng: lng });
+        window.mapModule.map.setZoom(16.0);
     }
 };
