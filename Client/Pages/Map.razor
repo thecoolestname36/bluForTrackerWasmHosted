@@ -18,14 +18,14 @@
                     <tr>
                         <th>Username</th>
                         <th>Status</th>
-                        <th>Last Reported At</th>
+                        <th>Age</th>
                         <th>Remove Icon</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach(var item in _markers)
                     {
-                        <tr style="cursor:pointer; box-shadow:0px 0px 15px inset @item.Value.Color">
+                        <tr style="cursor:pointer; box-shadow:0px -16px 32px inset @item.Value.Color">
                             <td @onclick="async () => await SetCenter(item.Value)">@item.Value.Label</td>
                             <td @onclick="async () => await SetCenter(item.Value)">@(item.Value.Connected ? "Connected" : "Disconnected")</td>
                             <td @onclick="async () => await SetCenter(item.Value)">@MakeLastReportedAt(item.Value.UpdatedOn)</td>
@@ -58,8 +58,9 @@
 
     HubConnection? _hubConnection;
 
-    ConcurrentDictionary<string, Marker> _markers = new();
+    Timer? _renderTimer;
 
+    ConcurrentDictionary<string, Marker> _markers = new();
 
     protected override void OnParametersSet()
     {
@@ -79,6 +80,7 @@
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         await base.OnAfterRenderAsync(firstRender);
+        
         if(firstRender)
         {
             _error = null;
@@ -93,7 +95,8 @@
         }
     }
 
-    async Task<HubConnection> GetHubConnection()
+    [JSInvokable]
+    public async Task<HubConnection> GetHubConnection()
     {
         if(_hubConnection == null || _hubConnection.State == HubConnectionState.Disconnected)
         {
@@ -137,8 +140,6 @@
         return _hubConnection;
     }
 
-    Timer? _renderTimer;
-
     [JSInvokable]
     public void WatchPositionErrorCallback()
     {
@@ -161,18 +162,13 @@
 
     string MakeLastReportedAt(DateTimeOffset updatedOn)
     {
-        var timestamp = updatedOn.ToLocalTime().ToString("h:mm:ss t");
-        var ageSeconds = (DateTimeOffset.UtcNow - updatedOn).TotalSeconds;
-        if (ageSeconds > 60)
+
+        var diff = DateTimeOffset.UtcNow - updatedOn;
+        if (diff.TotalSeconds >= 15)
         {
-            var totalMinutes = (int)(DateTimeOffset.UtcNow - updatedOn).TotalMinutes;
-            return $"{timestamp} (Age: {totalMinutes} minute" + (totalMinutes > 1 ? "s)" : ")");
+            return new DateTime(diff.Ticks).ToString("m:ss");
         }
-        else if (ageSeconds > 15)
-        {
-            return $"{timestamp} (Age: {(int)ageSeconds} seconds)";
-        }
-        return timestamp;
+        return "";
     }
 
     async Task SetCenter(Marker marker) => await JSRuntime.InvokeVoidAsync("mapModule.setCenter", marker.Latitude, marker.Longitude);
