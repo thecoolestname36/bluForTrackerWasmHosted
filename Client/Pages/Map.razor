@@ -88,11 +88,12 @@
         {
             _error = null;
             await JSRuntime.InvokeVoidAsync("mapModule.getCurrentPosition", DotNetObjectReference.Create(this));
-            _renderTimer = new Timer(callback: new TimerCallback((state) =>
+            _renderTimer = new Timer(callback: new TimerCallback(async (state) =>
             {
                 if(state is Map map)
                 {
                     map.StateHasChanged();
+                    await map.GetHubConnection();
                 }
             }), this, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
         }
@@ -100,7 +101,6 @@
 
     async Task ReportLocation() => await JSRuntime.InvokeVoidAsync("mapModule.getCurrentPosition", DotNetObjectReference.Create(this));
 
-    [JSInvokable]
     public async Task<HubConnection> GetHubConnection()
     {
         if(_hubConnection == null || _hubConnection.State == HubConnectionState.Disconnected)

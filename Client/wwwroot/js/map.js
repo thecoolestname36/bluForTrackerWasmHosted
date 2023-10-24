@@ -77,11 +77,5 @@ window.mapModule = {
     setCenter: function (lat, lng) {
         window.mapModule.map.setCenter({ lat: lat, lng: lng });
         window.mapModule.map.setZoom(16.0);
-    },
-    focus: function () {
-        console.log("focus");
-        window.mapModule.dotNetReference.invokeMethodAsync("GetHubConnection");
     }
 };
-
-window.addEventListener('focus', window.mapModule.focus);
