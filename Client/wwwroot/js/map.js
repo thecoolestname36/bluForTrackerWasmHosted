@@ -5,44 +5,33 @@ window.mapModule = {
     loading: true,
     dotNetReference: null,
     sendingPosition: false,
-    sendPositionDebounce: null,
     enableHighAccuracy: true,
     mapsCallback: function () {
         window.mapModule.loading = false;
     },
-    watchPosition: function (ref) {
-        console.log("watchPosition");
+    getCurrentPosition: function (ref) {
         window.mapModule.dotNetReference = ref;
-        window.mapModule.positionWatch = navigator.geolocation.watchPosition(function (position) {
-            if(window.mapModule.sendPositionDebounce !== null) return;
-            window.mapModule.sendPositionDebounce = setTimeout(() => {
-                if(window.mapModule.loading === true) {
-                    console.log("watchPosition - loading...");
-                    return;
-                }
-                if(window.mapModule.map === null) {
-                    console.log("watchPosition - init map");
-                    window.mapModule.map = new google.maps.Map(document.getElementById("map"), {
-                        zoom: 16,
-                        center: { lat: position.coords.latitude, lng: position.coords.longitude },
-                        mapTypeId: 'terrain'
-                    });
-                }
-                if(window.mapModule.sendingPosition === true) {
-                    console.log("watchPosition - SendingPosition...")
-                    return;
-                }
-                window.mapModule.sendingPosition = true;
-                console.log("watchPosition - SendPosition");
-                window.mapModule.dotNetReference.invokeMethodAsync("SendPosition", position.coords.latitude, position.coords.longitude);
-                window.mapModule.sendPositionDebounce = null;
-            }, 250);
-        }, function (error) {
-            console.error(`ERROR(${error.code}): ${error.message}`);
-            window.mapModule.enableHighAccuracy = false;
-            window.mapModule.dotNetReference.invokeMethodAsync("WatchPositionErrorCallback");
-        }, {
-            enableHighAccuracy: window.mapModule.enableHighAccuracy
+        navigator.geolocation.getCurrentPosition(function (position) {
+            if(window.mapModule.loading === true) {
+                console.log("watchPosition - loading...");
+                return;
+            }
+            if(window.mapModule.map === null) {
+                console.log("watchPosition - init map");
+                window.mapModule.map = new google.maps.Map(document.getElementById("map"), {
+                    zoom: 16,
+                    center: { lat: position.coords.latitude, lng: position.coords.longitude },
+                    mapTypeId: 'terrain'
+                });
+            }
+            if(window.mapModule.sendingPosition === true) {
+                console.log("watchPosition - SendingPosition...")
+                return;
+            }
+            window.mapModule.sendingPosition = true;
+            console.log("watchPosition - SendPosition");
+            window.mapModule.dotNetReference.invokeMethodAsync("SendPosition", position.coords.latitude, position.coords.longitude);
+            window.mapModule.sendPositionDebounce = null;
         });
     },
     doneSendingPosition: function () {
