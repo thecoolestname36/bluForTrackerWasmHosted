@@ -18,6 +18,7 @@
         <div class="form-group">
             <label for="team">Team:</label>
             <InputSelect @bind-Value="_formData.Team" id="team" class="form-control" required>
+                <option value=""></option>
                 @foreach(var item in Enum.GetValues(typeof(Team))) {
                     <option value="@item">@item.ToString()</option>
                 }
