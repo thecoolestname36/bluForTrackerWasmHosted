@@ -4,6 +4,7 @@ window.mapModule = {
     map: null, // This property will hold the map instance
     dotNetReference: null,
     firstLoad: true,
+    loading: true,
     isLoading: function () {
         return window.mapModule.loading;
     },
@@ -26,6 +27,10 @@ window.mapModule = {
     },
     watchPosition: function () {
         console.log("watchPosition");
+        window.mapModule.firstLoad = true;
+        if(window.mapModule.positionWatch != null) {
+            navigator.geolocation.clearWatch(window.mapModule.positionWatch);
+        }
         window.mapModule.positionWatch = navigator.geolocation.watchPosition(function (position) {
             if(window.mapModule.firstLoad) {
                 window.mapModule.firstLoad = false;

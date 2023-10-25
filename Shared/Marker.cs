@@ -6,6 +6,7 @@ public record Marker
 {
     public string Id { get; set; } = "unk";
     public string Label { get; set; } = "";
+    public Team Team { get; set; }
     public DateTimeOffset UpdatedOn { get; set; } = DateTimeOffset.MinValue;
     public double Latitude { get; set; }
     public double Longitude { get; set; }

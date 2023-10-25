@@ -144,6 +144,7 @@
                     {
                         Latitude = lat,
                         Longitude = lng,
+                        Team = _formData?.Team ?? Team.None,
                         Label = _formData?.Label ?? "",
                         Color = _formData?.Color ?? "#000000",
                         Connected = true
@@ -212,17 +213,21 @@
                 }
                 await LocalStorage.SetItemAsStringAsync("connection_id", connectionId);
             });
-            _hubConnection.On<ConcurrentDictionary<string, Marker>>(Routing.MarkerHub.Client.ReceiveMarkers, async (markers) =>
+            _hubConnection.On<ICollection<Marker>>(Routing.MarkerHub.Client.ReceiveMarkers, async (markers) =>
             {
-                _markers = markers;
+                _markers = new ConcurrentDictionary<string, Marker>(
+                    markers.Where(marker => marker.Team == _formData?.Team).Select(marker => new KeyValuePair<string, Marker>(marker.Id, marker)));
                 StateHasChanged();
                 await JSRuntime.InvokeVoidAsync("mapModule.updateMap", _markers);
             });
             _hubConnection.On<Marker>(Routing.MarkerHub.Client.ReceiveMarker, async (marker) =>
             {
-                _markers[marker.Id] = marker;
-                StateHasChanged();
-                await JSRuntime.InvokeVoidAsync("mapModule.updateMap", _markers);
+                if (marker.Team == _formData?.Team)
+                {
+                    _markers[marker.Id] = marker;
+                    StateHasChanged();
+                    await JSRuntime.InvokeVoidAsync("mapModule.updateMap", _markers);
+                }
             });
             _hubConnection.On<string>(Routing.MarkerHub.Client.RemoveMarker, async (key) =>
             {
@@ -242,13 +247,20 @@
 
     public async ValueTask DisposeAsync()
     {
+        _markers.Clear();
+        _currentLocation = null;
+        _formData = null;
         if(_hubConnection != null)
         {
             await _hubConnection.DisposeAsync();
+            _hubConnection = null;
         }
         _viewRenderTimer?.Dispose();
+        _viewRenderTimer = null;
         _mapLoadTimer?.Dispose();
+        _mapLoadTimer = null;
         _sendLocationTimer?.Dispose();
+        _sendLocationTimer = null;
     }
 
     #endregion

@@ -12,7 +12,7 @@ public class MarkerHub : Hub
     {
         await base.OnConnectedAsync();
         await Clients.Caller.SendAsync(Routing.MarkerHub.Client.ReceiveConnectionId, Context.ConnectionId);
-        await Clients.Caller.SendAsync(Routing.MarkerHub.Client.ReceiveMarkers, Markers);
+        await Clients.Caller.SendAsync(Routing.MarkerHub.Client.ReceiveMarkers, Markers.Values);
     }
 
     public override async Task OnDisconnectedAsync(Exception? exception)
