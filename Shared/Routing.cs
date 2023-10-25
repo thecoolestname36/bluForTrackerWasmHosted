@@ -8,10 +8,10 @@ public struct Routing {
             public const string RemoveMarker = "RemoveMarker";
         }
         public struct Client {
+            public const string ReceiveConnectionId = "ReceiveConnectionId";
             public const string ReceiveMarkers = "ReceiveMarkers";
             public const string ReceiveMarker = "ReceiveMarker";
             public const string RemoveMarker = "RemoveMarker";
-            public const string UserDisconnected = "UserDisconnected";
         }
     }
 }

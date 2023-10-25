@@ -11,6 +11,7 @@ public class MarkerHub : Hub
     public override async Task OnConnectedAsync()
     {
         await base.OnConnectedAsync();
+        await Clients.Caller.SendAsync(Routing.MarkerHub.Client.ReceiveConnectionId, Context.ConnectionId);
         await Clients.Caller.SendAsync(Routing.MarkerHub.Client.ReceiveMarkers, Markers);
     }
 
@@ -19,8 +20,8 @@ public class MarkerHub : Hub
         await base.OnDisconnectedAsync(exception);
         if(Markers.ContainsKey(Context.ConnectionId)) {
             Markers[Context.ConnectionId].Connected = false;
+            await Clients.All.SendAsync(Routing.MarkerHub.Client.ReceiveMarker, Markers[Context.ConnectionId]);
         }
-        await Clients.Others.SendAsync(Routing.MarkerHub.Client.UserDisconnected, Context.ConnectionId);
     }
 
     [HubMethodName(Routing.MarkerHub.Server.BroadcastMarker)]
@@ -28,7 +29,7 @@ public class MarkerHub : Hub
     {
         marker.UpdatedOn = DateTimeOffset.UtcNow;
         marker.Id = Context.ConnectionId;
-        Markers[marker.Id] = marker;
+        Markers[Context.ConnectionId] = marker;
         foreach(var item in Markers)
         {
             if(item.Value == null || (DateTimeOffset.UtcNow - item.Value.UpdatedOn).TotalSeconds > 3600)
@@ -37,7 +38,7 @@ public class MarkerHub : Hub
                 await Clients.All.SendAsync(Routing.MarkerHub.Client.RemoveMarker, item.Key);
             }
         }
-        await Clients.All.SendAsync(Routing.MarkerHub.Client.ReceiveMarker, Context.ConnectionId, marker);
+        await Clients.All.SendAsync(Routing.MarkerHub.Client.ReceiveMarker, marker);
     }
 
     [HubMethodName(Routing.MarkerHub.Server.RemoveMarker)]

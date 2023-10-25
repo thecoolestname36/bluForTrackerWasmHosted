@@ -33,7 +33,15 @@ window.mapModule = {
             }
             window.mapModule.dotNetReference.invokeMethodAsync("UpdateCurrentPosition", position.coords.latitude, position.coords.longitude);
         }, function (error) {
-            console.error(`ERROR(${error.code}): ${error.message}`);
+            console.error(error);
+            window.mapModule.firstLoad = true;
+            navigator.geolocation.clearWatch(window.mapModule.positionWatch);
+            if(error.code == GeolocationPositionError.PERMISSION_DENIED) {
+                alert("Location permission denied. Please allow location access.");
+                window.mapModule.dotNetReference.invokeMethodAsync("UpdateCurrentPositionError");
+                return;
+            }
+            window.mapModule.watchPosition();
         }, {
             enableHighAccuracy: true
         });

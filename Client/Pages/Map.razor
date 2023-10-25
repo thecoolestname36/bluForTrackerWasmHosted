@@ -3,16 +3,16 @@
 @using System.Text
 @using System.Text.Json
 @using System.Collections.Concurrent
-@using BluForTracker.Shared
 @using Microsoft.AspNetCore.SignalR.Client
+@using Blazored.LocalStorage
+@using BluForTracker.Shared
 @implements IAsyncDisposable
 
 <PageTitle>Map</PageTitle>
 <div id="map-container">
     <div id="map"></div>
     <div id="map-player-box">
-        @if (_hubConnection?.State == HubConnectionState.Connected)
-        {
+        @if (_hubConnection?.State == HubConnectionState.Connected) {
             <table class="tableScrollable">
                 <thead>
                     <tr>
@@ -37,18 +37,28 @@
                                 }
                             }
                             <td @onclick="async () => await SetCenter(item.Value)">@age</td>
-                        <td><button @onclick="async () => await RemoveMarker(item.Value.Id)">REMOVE</button></td>
+                            <td><button type="button" class="btn btn-danger btn-sm btn-block" @onclick="async () => await RemoveMarker(item.Value.Id)">REMOVE</button></td>
                     </tr>
                 }
             </tbody>
             </table>
-        } else
-        {
-            <div class="alert alert-danger" role="alert">@(_hubConnection?.State.ToString() ?? "No hub connection")</div>
+        } else {
+            switch(_hubConnection?.State) {
+                case HubConnectionState.Connecting:
+                case HubConnectionState.Reconnecting:
+                    <div class="alert alert-warning" role="alert">@_hubConnection?.State.ToString()</div>
+                    break;
+                case HubConnectionState.Disconnected:
+                    <div class="alert alert-danger" role="alert">@_hubConnection?.State.ToString()</div>
+                    break;
+                case null:
+                default:
+                    <div class="alert alert-secondary" role="alert">No hub connection</div>
+                    break;
+            }
         }
     </div>
 </div>
-
 
 @code {
 
@@ -58,11 +68,13 @@
     [Inject]
     public required IJSRuntime JSRuntime { get; set; }
 
+    [Inject]
+    public required ILocalStorageService LocalStorage { get; set; }
+
     [Parameter]
     public required string FormData { get; set; }
 
     Index.MarkerFormModel? _formData = null;
-    string? _error = null;
     HubConnection? _hubConnection;
     ConcurrentDictionary<string, Marker> _markers = new();
 
@@ -112,32 +124,22 @@
         }
     }
 
-    PeriodicTimer? _mapLoadTimer;
-    async Task MapLoadLoop()
-    {
-        _mapLoadTimer ??= new(TimeSpan.FromMilliseconds(250));
-        while (await _mapLoadTimer.WaitForNextTickAsync())
-        {
-            if (!(await JSRuntime.InvokeAsync<bool>("window.mapModule.isLoading")))
-            {
-                _mapLoadTimer.Dispose();
-                return;
-            }
-        }
-    }
-
     PeriodicTimer? _sendLocationTimer;
     async void SendLocationLoop()
     {
-        _sendLocationTimer ??= new(TimeSpan.FromSeconds(1));
+        _sendLocationTimer ??= new(TimeSpan.FromMilliseconds(125));
+        var sending = false;
         while(await _sendLocationTimer.WaitForNextTickAsync())
         {
+            if(sending) continue;
+
             var hubConnection = await GetHubConnection();
             if(hubConnection.State == HubConnectionState.Connected && _currentLocation.HasValue)
             {
                 var lat = _currentLocation.Value.Latitude;
                 var lng = _currentLocation.Value.Longitude;
                 _currentLocation = null;
+                sending = true;
                 await hubConnection.SendAsync(Routing.MarkerHub.Server.BroadcastMarker, new Marker
                     {
                         Latitude = lat,
@@ -146,6 +148,21 @@
                         Color = _formData?.Color ?? "#000000",
                         Connected = true
                     });
+                sending = false;
+            }
+        }
+    }
+
+    PeriodicTimer? _mapLoadTimer;
+    async Task MapLoadLoop()
+    {
+        _mapLoadTimer ??= new(TimeSpan.FromMilliseconds(250));
+        while(await _mapLoadTimer.WaitForNextTickAsync())
+        {
+            if(!(await JSRuntime.InvokeAsync<bool>("window.mapModule.isLoading")))
+            {
+                _mapLoadTimer.Dispose();
+                return;
             }
         }
     }
@@ -155,7 +172,10 @@
     {
         Latitude = lat,
         Longitude = lng
-    };    
+    };
+
+    [JSInvokable]
+    public void UpdateCurrentPositionError() => NavManager.NavigateTo("/");
 
     async Task RemoveMarker(string key)
     {
@@ -170,23 +190,37 @@
 
     public async Task<HubConnection> GetHubConnection()
     {
-        if(_hubConnection == null || _hubConnection.State == HubConnectionState.Disconnected)
+        if (_hubConnection == null)
         {
             var builder = new UriBuilder(NavManager.BaseUri);
             builder.Path += Routing.MarkerHub.Path;
             _hubConnection = new HubConnectionBuilder()
                 .WithUrl(builder.Uri)
                 .Build();
-            _hubConnection.ServerTimeout = TimeSpan.FromSeconds(60);
+            _hubConnection.ServerTimeout = TimeSpan.FromSeconds(15);
+            _hubConnection.KeepAliveInterval = TimeSpan.FromSeconds(5);
+            _hubConnection.On<string>(Routing.MarkerHub.Client.ReceiveConnectionId, async (connectionId) =>
+            {
+                var oldConnectionId = await LocalStorage.GetItemAsStringAsync("connection_id");
+                if(!string.IsNullOrEmpty(oldConnectionId))
+                {
+                    var hubConnection = await GetHubConnection();
+                    if (hubConnection.State == HubConnectionState.Connected)
+                    {
+                        await hubConnection.SendAsync(Routing.MarkerHub.Server.RemoveMarker, oldConnectionId);
+                    }
+                }
+                await LocalStorage.SetItemAsStringAsync("connection_id", connectionId);
+            });
             _hubConnection.On<ConcurrentDictionary<string, Marker>>(Routing.MarkerHub.Client.ReceiveMarkers, async (markers) =>
             {
                 _markers = markers;
                 StateHasChanged();
                 await JSRuntime.InvokeVoidAsync("mapModule.updateMap", _markers);
             });
-            _hubConnection.On<string, Marker>(Routing.MarkerHub.Client.ReceiveMarker, async (key, marker) =>
+            _hubConnection.On<Marker>(Routing.MarkerHub.Client.ReceiveMarker, async (marker) =>
             {
-                _markers[key] = marker;
+                _markers[marker.Id] = marker;
                 StateHasChanged();
                 await JSRuntime.InvokeVoidAsync("mapModule.updateMap", _markers);
             });
@@ -196,14 +230,9 @@
                 StateHasChanged();
                 await JSRuntime.InvokeVoidAsync("mapModule.updateMap", _markers);
             });
-            _hubConnection.On<string>(Routing.MarkerHub.Client.UserDisconnected, (key) =>
-            {
-                if(_markers.ContainsKey(key))
-                {
-                    _markers[key].Connected = false;
-                    StateHasChanged();
-                }
-            });
+        }
+        if (_hubConnection.State == HubConnectionState.Disconnected)
+        {
             await _hubConnection.StartAsync();
         }
         return _hubConnection;

@@ -3,11 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.7.34018.315
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BluForTracker.Server", "Server\BluForTracker.Server.csproj", "{89513B9F-5D0F-405D-9933-80A9DF8B13EB}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BluForTracker.Server", "Server\BluForTracker.Server.csproj", "{89513B9F-5D0F-405D-9933-80A9DF8B13EB}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BluForTracker.Client", "Client\BluForTracker.Client.csproj", "{72881A59-8B29-4E75-A0C1-8AD7B3205B04}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BluForTracker.Client", "Client\BluForTracker.Client.csproj", "{72881A59-8B29-4E75-A0C1-8AD7B3205B04}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BluForTracker.Shared", "Shared\BluForTracker.Shared.csproj", "{14D2DDED-46F0-4C45-A0FF-1D2F1A6A8489}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BluForTracker.Shared", "Shared\BluForTracker.Shared.csproj", "{14D2DDED-46F0-4C45-A0FF-1D2F1A6A8489}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -35,6 +35,6 @@ app.UseRouting();
 app.MapRazorPages();
 app.MapControllers();
 app.MapHub<MarkerHub>(Routing.MarkerHub.Path);
-app.MapFallbackToFile("index.html");
+app.MapFallbackToPage("/_Host");
 
 app.Run();
