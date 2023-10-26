@@ -74,17 +74,17 @@
     [Parameter]
     public required string FormData { get; set; }
 
-    Index.MarkerFormModel? _formData = null;
-    HubConnection? _hubConnection;
-    ConcurrentDictionary<string, Marker> _markers = new();
-
     struct GeolocationCoordinates
     {
-        public double Latitude { get; init; } 
-        public double Longitude { get; init; }
+        public required double Latitude { get; init; }
+        public required double Longitude { get; init; }
     }
 
     GeolocationCoordinates? _currentLocation;
+    InfoMarker? _myInfoMarker;
+    Index.MarkerFormModel? _formData = null;
+    HubConnection? _hubConnection;
+    ConcurrentDictionary<string, Marker> _markers = new();
 
     protected override void OnParametersSet()
     {
@@ -107,10 +107,30 @@
 
         if(firstRender)
         {
+            await MapLoadLoop();
             ViewRenderLoop();
             SendLocationLoop();
-            await MapLoadLoop();
-            await JSRuntime.InvokeVoidAsync("mapModule.addListenerOnceMapIdle", DotNetObjectReference.Create(this));
+            SendMyInfoMarkerLoop();
+        }
+    }
+
+    PeriodicTimer? _mapLoadTimer;
+    async Task MapLoadLoop()
+    {
+        _mapLoadTimer ??= new(TimeSpan.FromMilliseconds(125));
+        while(await _mapLoadTimer.WaitForNextTickAsync())
+        {
+            switch(await JSRuntime.InvokeAsync<int>("window.mapModule.getLoadingState"))
+            {
+                case -1: // Done, return
+                    _mapLoadTimer.Dispose();
+                    return;
+                case 1: // Wait for Google Map idle done event.
+                    await JSRuntime.InvokeVoidAsync("mapModule.addListenerOnceMapIdle", DotNetObjectReference.Create(this));
+                    continue;
+                default: // Still waiting for something to happen...
+                    continue;
+            }
         }
     }
 
@@ -136,34 +156,48 @@
             var hubConnection = await GetHubConnection();
             if(hubConnection.State == HubConnectionState.Connected && _currentLocation.HasValue)
             {
-                var lat = _currentLocation.Value.Latitude;
-                var lng = _currentLocation.Value.Longitude;
+                var marker = new Marker
+                {
+                    Latitude = _currentLocation.Value.Latitude,
+                    Longitude = _currentLocation.Value.Longitude,
+                    Team = _formData?.Team ?? Team.None,
+                    Label = _formData?.Label ?? "",
+                    Color = _formData?.Color ?? "#000000",
+                    Connected = true
+                };
                 _currentLocation = null;
                 sending = true;
-                await hubConnection.SendAsync(Routing.MarkerHub.Server.BroadcastMarker, new Marker
-                    {
-                        Latitude = lat,
-                        Longitude = lng,
-                        Team = _formData?.Team ?? Team.None,
-                        Label = _formData?.Label ?? "",
-                        Color = _formData?.Color ?? "#000000",
-                        Connected = true
-                    });
+                await hubConnection.SendAsync(Routing.MarkerHub.Server.BroadcastMarker, marker);
                 sending = false;
             }
         }
     }
 
-    PeriodicTimer? _mapLoadTimer;
-    async Task MapLoadLoop()
+    PeriodicTimer? _sendMyInfoMarkerTimer;
+    async void SendMyInfoMarkerLoop()
     {
-        _mapLoadTimer ??= new(TimeSpan.FromMilliseconds(250));
-        while(await _mapLoadTimer.WaitForNextTickAsync())
+        _sendMyInfoMarkerTimer ??= new(TimeSpan.FromSeconds(1));
+        var sending = false;
+        while(await _sendMyInfoMarkerTimer.WaitForNextTickAsync())
         {
-            if(!(await JSRuntime.InvokeAsync<bool>("window.mapModule.isLoading")))
+            if (sending) continue;
+
+            var hubConnection = await GetHubConnection();
+            if(hubConnection.State == HubConnectionState.Connected && _myInfoMarker != null)
             {
-                _mapLoadTimer.Dispose();
-                return;
+                var infoMarker = new InfoMarker
+                {
+                    Team = _formData?.Team ?? Team.None,
+                    Label = _myInfoMarker.Label,
+                    LabelColor = _myInfoMarker.LabelColor,
+                    Message = _myInfoMarker.Message,
+                    Latitude = _myInfoMarker.Latitude,
+                    Longitude = _myInfoMarker.Longitude
+                };
+                _myInfoMarker = null;
+                sending = true;
+                await hubConnection.SendAsync(Routing.MarkerHub.Server.BroadcastInfoMarker, infoMarker);
+                sending = false;
             }
         }
     }
@@ -177,6 +211,17 @@
 
     [JSInvokable]
     public void UpdateCurrentPositionError() => NavManager.NavigateTo("/");
+
+    [JSInvokable]
+    public void UpdateMyInfoMarker(string message, double lat, double lng) => _myInfoMarker = new InfoMarker()
+    {
+        Team = _formData?.Team ?? Team.None,
+        Label = _formData?.Label ?? "unk",
+        LabelColor = _formData?.Color ?? "#000000",
+            Message = string.IsNullOrEmpty(message) ? "" : message + "<br/>",
+        Latitude = lat,
+        Longitude = lng
+    };
 
     async Task RemoveMarker(string key)
     {
@@ -200,8 +245,7 @@
                 .Build();
             _hubConnection.ServerTimeout = TimeSpan.FromSeconds(15);
             _hubConnection.KeepAliveInterval = TimeSpan.FromSeconds(5);
-            _hubConnection.On<string>(Routing.MarkerHub.Client.ReceiveConnectionId, async (connectionId) =>
-            {
+            _hubConnection.On<string>(Routing.MarkerHub.Client.ReceiveConnectionId, async (connectionId) => {
                 var oldConnectionId = await LocalStorage.GetItemAsStringAsync("connection_id");
                 if(!string.IsNullOrEmpty(oldConnectionId))
                 {
@@ -209,32 +253,41 @@
                     if (hubConnection.State == HubConnectionState.Connected)
                     {
                         await hubConnection.SendAsync(Routing.MarkerHub.Server.RemoveMarker, oldConnectionId);
+                        await hubConnection.SendAsync(Routing.MarkerHub.Server.RemoveInfoMarker, oldConnectionId);
                     }
                 }
                 await LocalStorage.SetItemAsStringAsync("connection_id", connectionId);
             });
-            _hubConnection.On<ICollection<Marker>>(Routing.MarkerHub.Client.ReceiveMarkers, async (markers) =>
+            _hubConnection.On<ICollection<Marker>>(Routing.MarkerHub.Client.SyncMarkers, async (markers) =>
             {
                 _markers = new ConcurrentDictionary<string, Marker>(
                     markers.Where(marker => marker.Team == _formData?.Team).Select(marker => new KeyValuePair<string, Marker>(marker.Id, marker)));
                 StateHasChanged();
-                await JSRuntime.InvokeVoidAsync("mapModule.updateMap", _markers);
+                await JSRuntime.InvokeVoidAsync("mapModule.syncMarkers", markers);
             });
-            _hubConnection.On<Marker>(Routing.MarkerHub.Client.ReceiveMarker, async (marker) =>
-            {
+            _hubConnection.On<Marker>(Routing.MarkerHub.Client.ReceiveMarker, async (marker) => {
                 if (marker.Team == _formData?.Team)
                 {
                     _markers[marker.Id] = marker;
                     StateHasChanged();
-                    await JSRuntime.InvokeVoidAsync("mapModule.updateMap", _markers);
+                    await JSRuntime.InvokeVoidAsync("mapModule.receiveMarker", marker);
                 }
             });
-            _hubConnection.On<string>(Routing.MarkerHub.Client.RemoveMarker, async (key) =>
-            {
+            _hubConnection.On<string>(Routing.MarkerHub.Client.RemoveMarker, async (key) => {
                 _markers.TryRemove(key, out _);
                 StateHasChanged();
-                await JSRuntime.InvokeVoidAsync("mapModule.updateMap", _markers);
+                await JSRuntime.InvokeVoidAsync("mapModule.removeMarker", key);
             });
+            _hubConnection.On<ICollection<InfoMarker>>(Routing.MarkerHub.Client.SyncInfoMarkers, async (infoMarkers)
+                => await JSRuntime.InvokeVoidAsync("mapModule.syncInfoMarkers", infoMarkers.Where(infoMarker => infoMarker.Team == _formData?.Team)));
+            _hubConnection.On<InfoMarker>(Routing.MarkerHub.Client.ReceiveInfoMarker, async (infoMarker) => {
+                if(infoMarker.Team == _formData?.Team)
+                {
+                    await JSRuntime.InvokeVoidAsync("mapModule.receiveInfoMarker", infoMarker);
+                }
+            });
+            _hubConnection.On<string>(Routing.MarkerHub.Client.RemoveInfoMarker, async (key) 
+                => await JSRuntime.InvokeVoidAsync("mapModule.removeInfoMarker", key));
         }
         if (_hubConnection.State == HubConnectionState.Disconnected)
         {
@@ -261,6 +314,8 @@
         _mapLoadTimer = null;
         _sendLocationTimer?.Dispose();
         _sendLocationTimer = null;
+        _sendMyInfoMarkerTimer?.Dispose();
+        _sendMyInfoMarkerTimer = null;
     }
 
     #endregion

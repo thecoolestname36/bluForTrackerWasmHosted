@@ -16,23 +16,24 @@
         <ValidationSummary />
 
         <div class="form-group">
-            <label for="team">Team:</label>
-            <InputSelect @bind-Value="_formData.Team" id="team" class="form-control" required>
-                <option value=""></option>
-                @foreach(var item in Enum.GetValues(typeof(Team))) {
-                    <option value="@item">@item.ToString()</option>
-                }
-            </InputSelect>
-        </div>
-
-        <div class="form-group">
             <label for="label">Username (Max @MarkerFormModel.LabelMaxChars characters):</label>
             <InputText @bind-Value="_formData.Label" class="form-control required" id="label" required />
             <ValidationMessage For="@(() => _formData.Label)" />
         </div>
 
         <div class="form-group">
-            <label for="color">Color:</label>
+            <label for="team">Team:</label>
+            <InputSelect @bind-Value="_formData.Team" id="team" class="form-control" required>
+                <option value=""></option>
+                @foreach(var item in Enum.GetValues(typeof(Team)))
+                {
+                    <option value="@item">@item.ToString()</option>
+                }
+            </InputSelect>
+        </div>
+
+        <div class="form-group">
+            <label for="color">Marker Color:</label>
             <input type="color" @bind="_formData.Color" id="color" required />
         </div>
 
