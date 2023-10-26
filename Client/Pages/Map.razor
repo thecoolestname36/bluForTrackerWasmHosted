@@ -210,7 +210,7 @@
     };
 
     [JSInvokable]
-    public void UpdateCurrentPositionError() => NavManager.NavigateTo("/");
+    public void UpdateCurrentPositionError() => NavManager.NavigateTo("/", true);
 
     [JSInvokable]
     public void UpdateMyInfoMarker(string message, double lat, double lng) => _myInfoMarker = new InfoMarker()
@@ -222,6 +222,16 @@
         Latitude = lat,
         Longitude = lng
     };
+
+    [JSInvokable]
+    public async Task RemoveInfoMarker(string key)
+    {
+        var hubConnection = await GetHubConnection();
+        if (hubConnection.State == HubConnectionState.Connected)
+        {
+            await hubConnection.SendAsync(Routing.MarkerHub.Server.RemoveInfoMarker, key);    
+        }
+    }
 
     async Task RemoveMarker(string key)
     {
@@ -263,7 +273,7 @@
                 _markers = new ConcurrentDictionary<string, Marker>(
                     markers.Where(marker => marker.Team == _formData?.Team).Select(marker => new KeyValuePair<string, Marker>(marker.Id, marker)));
                 StateHasChanged();
-                await JSRuntime.InvokeVoidAsync("mapModule.syncMarkers", markers);
+                await JSRuntime.InvokeVoidAsync("mapModule.syncMarkers", _markers.Values);
             });
             _hubConnection.On<Marker>(Routing.MarkerHub.Client.ReceiveMarker, async (marker) => {
                 if (marker.Team == _formData?.Team)

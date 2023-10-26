@@ -10,11 +10,11 @@ window.mapModule = {
         return window.mapModule.loadingState;
     },
     mapsCallback: function () {
-        console.info("mapsCallback", 1);
+        //console.info("mapsCallback", 1);
         window.mapModule.loadingState = 1;
     },
     addListenerOnceMapIdle: function (ref) {
-        console.info("addListenerOnceMapIdle");
+        //console.info("addListenerOnceMapIdle");
         window.mapModule.dotNetReference = ref;
         window.mapModule.map = new google.maps.Map(document.getElementById("map"), {
             zoom: 5,
@@ -26,7 +26,7 @@ window.mapModule = {
             delete window.mapModule.markers[i];
         }
         for(let i = 0; i < window.mapModule.infoMarkers.length; i++) {
-            window.mapModule.infoMarkers[i].close();
+            window.mapModule.infoMarkers[i].setMap(null);
             delete window.mapModule.infoMarkers[i];
         }
         window.mapModule.map.addListener("click", (mapsMouseEvent) => {
@@ -36,14 +36,14 @@ window.mapModule = {
             }
         });
         google.maps.event.addListenerOnce(window.mapModule.map, 'idle', function () {
-            console.info("addListenerOnceMapIdle - fired");
+            //console.info("addListenerOnceMapIdle - fired");
             window.mapModule.watchPosition();
             window.mapModule.loadingState = -1;
         });
         window.mapModule.loadingState = 2;
     },
     watchPosition: function () {
-        console.info("watchPosition");
+        //console.info("watchPosition");
         window.mapModule.firstLoad = true;
         if(window.mapModule.positionWatch != null) {
             navigator.geolocation.clearWatch(window.mapModule.positionWatch);
@@ -109,7 +109,7 @@ window.mapModule = {
     syncInfoMarkers: function (newInfoMarkers) {
         //console.info("receiveInfoMarkers");
         for(let i = 0; i < window.mapModule.infoMarkers.length; i++) {
-            window.mapModule.infoMarkers[i].close();
+            window.mapModule.infoMarkers[i].setMap(null);
             delete window.mapModule.infoMarkers[i];
         }
         newInfoMarkers.forEach((infoMarker) => window.mapModule.receiveInfoMarker(infoMarker));
@@ -118,6 +118,9 @@ window.mapModule = {
         //console.info("receiveInfoMarker", infoMarker);
         if(!window.mapModule.infoMarkers.hasOwnProperty(infoMarker.id)) {
             window.mapModule.infoMarkers[infoMarker.id] = new google.maps.InfoWindow();
+            google.maps.event.addListener(window.mapModule.infoMarkers[infoMarker.id], 'closeclick', function () {
+                window.mapModule.dotNetReference.invokeMethodAsync("RemoveInfoMarker", infoMarker.id);
+            });
         }
         window.mapModule.infoMarkers[infoMarker.id].setPosition({ lat: infoMarker.latitude, lng: infoMarker.longitude });
 
@@ -139,7 +142,7 @@ window.mapModule = {
         window.mapModule.infoMarkers[infoMarker.id].open(window.mapModule.map);
     },
     removeInfoMarker: function (key) {
-        window.mapModule.infoMarkers[key].close();
+        window.mapModule.infoMarkers[key].setMap(null);
         delete window.mapModule.infoMarkers[key];
     },
     setCenter: function (lat, lng) {

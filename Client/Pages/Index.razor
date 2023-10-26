@@ -63,5 +63,5 @@
         public string Color { get; set; } = "#000000";
     }
 
-    private void OnSubmit() => NavManager.NavigateTo($"/map/{Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(_formData)))}");
+    private void OnSubmit() => NavManager.NavigateTo($"/map/{Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(_formData)))}", true);
 }
