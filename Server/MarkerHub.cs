@@ -69,7 +69,6 @@ public class MarkerHub : Hub
     [HubMethodName(Routing.MarkerHub.Server.RemoveInfoMarker)]
     public async Task RemoveInfoMarker(string key)
     {
-        Console.WriteLine($"RemoveInfoMarker: {key}");
         InfoMarkers.TryRemove(key, out _);
         await Clients.All.SendAsync(Routing.MarkerHub.Client.RemoveInfoMarker, key);
     }
