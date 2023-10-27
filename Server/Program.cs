@@ -4,7 +4,6 @@ using BluForTracker.Server;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
 builder.Services.AddSignalR();
 builder.Services.AddResponseCompression(opts =>
@@ -33,8 +32,7 @@ app.UseStaticFiles();
 app.UseRouting();
 
 app.MapRazorPages();
-app.MapControllers();
 app.MapHub<MarkerHub>(Routing.MarkerHub.Path);
-app.MapFallbackToPage("/_Host");
+app.MapFallbackToPage("/App");
 
 app.Run();

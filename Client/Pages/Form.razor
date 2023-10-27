@@ -1,4 +1,4 @@
-﻿@page "/"
+﻿@page "/{version}"
 @using System.Text
 @using System.Text.Json
 @using System.ComponentModel.DataAnnotations
@@ -47,6 +47,12 @@
 
 @code {
 
+    [Parameter]
+    public required string Version { get; set; }
+
+    [Parameter]
+    public string? FormData { get; set; }
+
     private MarkerFormModel _formData = new();
 
     public class MarkerFormModel
@@ -58,10 +64,10 @@
 
         [StringLength(LabelMaxChars, ErrorMessage = "Label must be 28 characters or less.")]
         public string Label { get; set; } = "";
-        
+
         [RegularExpression("^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$", ErrorMessage = "Invalid Format")]
         public string Color { get; set; } = "#000000";
     }
 
-    private void OnSubmit() => NavManager.NavigateTo($"/map/{Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(_formData)))}", true);
+    private void OnSubmit() => NavManager.NavigateTo($"/{Version}/map/{Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(_formData)))}");
 }

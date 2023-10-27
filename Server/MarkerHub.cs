@@ -13,8 +13,8 @@ public class MarkerHub : Hub
     {
         await base.OnConnectedAsync();
         await Clients.Caller.SendAsync(Routing.MarkerHub.Client.ReceiveConnectionId, Context.ConnectionId);
-        await Clients.Caller.SendAsync(Routing.MarkerHub.Client.SyncMarkers, Markers.Values);
-        await Clients.Caller.SendAsync(Routing.MarkerHub.Client.SyncInfoMarkers, InfoMarkers.Values);
+        await Clients.Caller.SendAsync(Routing.MarkerHub.Client.SyncMarkers, Markers.Values.ToList());
+        await Clients.Caller.SendAsync(Routing.MarkerHub.Client.SyncInfoMarkers, InfoMarkers.Values.ToList());
     }
 
     public override async Task OnDisconnectedAsync(Exception? exception)
@@ -60,7 +60,7 @@ public class MarkerHub : Hub
             if(item.Value == null || (DateTimeOffset.UtcNow - item.Value.CreatedOn).TotalSeconds > 3600)
             {
                 InfoMarkers.Remove(item.Key, out _);
-                await Clients.All.SendAsync(Routing.MarkerHub.Client.RemoveMarker, item.Key);
+                await Clients.All.SendAsync(Routing.MarkerHub.Client.RemoveInfoMarker, item.Key);
             }
         }
         await Clients.All.SendAsync(Routing.MarkerHub.Client.ReceiveInfoMarker, infoMarker);
@@ -69,7 +69,26 @@ public class MarkerHub : Hub
     [HubMethodName(Routing.MarkerHub.Server.RemoveInfoMarker)]
     public async Task RemoveInfoMarker(string key)
     {
+        Console.WriteLine($"RemoveInfoMarker: {key}");
         InfoMarkers.TryRemove(key, out _);
         await Clients.All.SendAsync(Routing.MarkerHub.Client.RemoveInfoMarker, key);
+    }
+
+    [HubMethodName(Routing.MarkerHub.Server.UpdateConnectionId)]
+    public async Task UpdateConnectionId(string oldConnectionId) 
+    {
+        if(Markers.TryRemove(oldConnectionId, out var oldMarker)) {
+            await Clients.All.SendAsync(Routing.MarkerHub.Client.RemoveMarker, oldConnectionId);
+            await BroadcastMarker(oldMarker with {
+                Id = Context.ConnectionId,
+                Connected = true
+            });
+        }
+        if(InfoMarkers.TryRemove(oldConnectionId, out var oldInfoMarker)) {
+            await Clients.All.SendAsync(Routing.MarkerHub.Client.RemoveInfoMarker, oldConnectionId);
+            await BroadcastInfoMarker(oldInfoMarker with {
+                Id = Context.ConnectionId
+            });
+        }
     }
 }

@@ -8,6 +8,7 @@ public struct Routing {
             public const string RemoveMarker = "RemoveMarker";
             public const string BroadcastInfoMarker = "BroadcastInfoMarker";
             public const string RemoveInfoMarker = "RemoveInfoMarker";
+            public const string UpdateConnectionId = "UpdateConnectionId";
         }
         public struct Client {
             public const string ReceiveConnectionId = "ReceiveConnectionId";
