@@ -28,15 +28,17 @@
                     {
                         <tr style="cursor:pointer; box-shadow:0px -16px 32px inset @item.Value.Color">
                             <td @onclick="async () => await SetCenter(item.Value)">@item.Value.Label</td>
-                            <td @onclick="async () => await SetCenter(item.Value)">@(item.Value.Connected ? "Connected" : "Disconnected")</td>
                             @{
+                                var status = item.Value.Connected ? "Connected" : "Disconnected";
                                 var age = "";
                                 var diff = DateTimeOffset.UtcNow - item.Value.UpdatedOn;
                                 if(diff.TotalSeconds >= 15)
                                 {
+                                    status = "Stale";
                                     age = new DateTime(diff.Ticks).ToString("m:ss");
                                 }
                             }
+                            <td @onclick="async () => await SetCenter(item.Value)">@status</td>
                             <td @onclick="async () => await SetCenter(item.Value)">@age</td>
                             <td><button type="button" class="btn btn-danger btn-sm btn-block" @onclick="async () => await RemoveMarker(item.Value.Id)">REMOVE</button></td>
                         </tr>
