@@ -116,6 +116,7 @@
             var collocatedJs = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./Pages/Map.razor.js");
             _mapModuleJs = await collocatedJs.InvokeAsync<IJSObjectReference>("CreateMapModule");
             await MapLoadLoop();
+            await GetHubConnection();
             ViewRenderLoop();
             SendLocationLoop();
             SendMyInfoMarkerLoop();
