@@ -19,8 +19,10 @@
     }
     else
     {
-        // Client needs a verison!
+        // Client needs a verison update!
+        Response.Headers.TryAdd("Clear-Site-Data", "cache");
         Response.Redirect($"/{appVersion}/");
+        return;
     }
 
     var googleMapsApiKey = Configuration.GetValue<string>("GoogleMapsApiKey");
