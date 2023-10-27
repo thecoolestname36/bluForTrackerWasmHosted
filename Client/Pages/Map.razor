@@ -268,7 +268,7 @@
                     var hubConnection = await GetHubConnection();
                     if (hubConnection.State == HubConnectionState.Connected)
                     {
-                        await hubConnection.SendAsync(Routing.MarkerHub.Server.UpdateConnectionId, oldConnectionId);
+                        await hubConnection.SendAsync(Routing.MarkerHub.Server.UpdateConnectionId, oldConnectionId, _formData?.Team ?? Team.None, _formData?.Color ?? "#000000");
                     }
                 }
                 await LocalStorage.SetItemAsStringAsync("connection_id", connectionId);

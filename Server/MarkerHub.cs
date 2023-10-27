@@ -12,6 +12,22 @@ public class MarkerHub : Hub
     public override async Task OnConnectedAsync()
     {
         await base.OnConnectedAsync();
+        foreach(var item in InfoMarkers)
+        {
+            if(item.Value == null || (DateTimeOffset.UtcNow - item.Value.CreatedOn).TotalSeconds > 3600)
+            {
+                InfoMarkers.Remove(item.Key, out _);
+                await Clients.All.SendAsync(Routing.MarkerHub.Client.RemoveInfoMarker, item.Key);
+            }
+        }
+        foreach(var item in Markers)
+        {
+            if(item.Value == null || (DateTimeOffset.UtcNow - item.Value.UpdatedOn).TotalSeconds > 3600)
+            {
+                Markers.Remove(item.Key, out _);
+                await Clients.All.SendAsync(Routing.MarkerHub.Client.RemoveMarker, item.Key);
+            }
+        }
         await Clients.Caller.SendAsync(Routing.MarkerHub.Client.ReceiveConnectionId, Context.ConnectionId);
         await Clients.Caller.SendAsync(Routing.MarkerHub.Client.SyncMarkers, Markers.Values.ToList());
         await Clients.Caller.SendAsync(Routing.MarkerHub.Client.SyncInfoMarkers, InfoMarkers.Values.ToList());
@@ -32,14 +48,6 @@ public class MarkerHub : Hub
         marker.UpdatedOn = DateTimeOffset.UtcNow;
         marker.Id = Context.ConnectionId;
         Markers[marker.Id] = marker;
-        foreach(var item in Markers)
-        {
-            if(item.Value == null || (DateTimeOffset.UtcNow - item.Value.UpdatedOn).TotalSeconds > 3600)
-            {
-                Markers.Remove(item.Key, out _);
-                await Clients.All.SendAsync(Routing.MarkerHub.Client.RemoveMarker, item.Key);
-            }
-        }
         await Clients.All.SendAsync(Routing.MarkerHub.Client.ReceiveMarker, marker);
     }
 
@@ -55,14 +63,6 @@ public class MarkerHub : Hub
         infoMarker.CreatedOn = DateTimeOffset.UtcNow;
         infoMarker.Id = Context.ConnectionId;
         InfoMarkers[infoMarker.Id] = infoMarker;
-        foreach(var item in InfoMarkers)
-        {
-            if(item.Value == null || (DateTimeOffset.UtcNow - item.Value.CreatedOn).TotalSeconds > 3600)
-            {
-                InfoMarkers.Remove(item.Key, out _);
-                await Clients.All.SendAsync(Routing.MarkerHub.Client.RemoveInfoMarker, item.Key);
-            }
-        }
         await Clients.All.SendAsync(Routing.MarkerHub.Client.ReceiveInfoMarker, infoMarker);
     }
 
@@ -75,19 +75,23 @@ public class MarkerHub : Hub
     }
 
     [HubMethodName(Routing.MarkerHub.Server.UpdateConnectionId)]
-    public async Task UpdateConnectionId(string oldConnectionId) 
+    public async Task UpdateConnectionId(string oldConnectionId, Team team, string labelColor) 
     {
         if(Markers.TryRemove(oldConnectionId, out var oldMarker)) {
             await Clients.All.SendAsync(Routing.MarkerHub.Client.RemoveMarker, oldConnectionId);
             await BroadcastMarker(oldMarker with {
                 Id = Context.ConnectionId,
-                Connected = true
+                Connected = true,
+                Team = team,
+                Color = labelColor
             });
         }
         if(InfoMarkers.TryRemove(oldConnectionId, out var oldInfoMarker)) {
             await Clients.All.SendAsync(Routing.MarkerHub.Client.RemoveInfoMarker, oldConnectionId);
             await BroadcastInfoMarker(oldInfoMarker with {
-                Id = Context.ConnectionId
+                Id = Context.ConnectionId,
+                Team = team,
+                LabelColor = labelColor
             });
         }
     }
