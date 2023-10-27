@@ -20,7 +20,7 @@
     else
     {
         // Client needs a verison!
-        Response.Redirect($"/{appVersion}");
+        Response.Redirect($"/{appVersion}/");
     }
 
     var googleMapsApiKey = Configuration.GetValue<string>("GoogleMapsApiKey");
