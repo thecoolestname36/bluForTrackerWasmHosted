@@ -6,6 +6,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddRazorPages();
 builder.Services.AddSignalR();
+builder.Services.AddControllers();
 builder.Services.AddResponseCompression(opts =>
 {
     opts.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(
@@ -33,6 +34,7 @@ app.UseRouting();
 
 app.MapRazorPages();
 app.MapHub<MarkerHub>(Routing.MarkerHub.Path);
+app.MapControllers();
 app.MapFallbackToPage("/App");
 
 app.Run();

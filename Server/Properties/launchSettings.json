@@ -12,6 +12,7 @@
     },
     "https": {
       "commandName": "Project",
+      "commandLineArgs": "--GoogleMapsApiKey=AIzaSyD7sn_0jeQWizxOxNLQFEUiEXOMd389c5k",
       "launchBrowser": true,
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"

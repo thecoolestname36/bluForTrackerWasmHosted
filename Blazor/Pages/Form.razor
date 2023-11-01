@@ -1,11 +1,13 @@
-@page "/form"
-@namespace BluForTracker.Razor.Pages
+﻿@* @page "/{version}"
 @using System.Text
 @using System.Text.Json
 @using System.ComponentModel.DataAnnotations
 @using Microsoft.AspNetCore.Components.Forms
 @using BluForTracker.Shared
-@using BluForTracker.Razor.DataModels
+@using BluForTracker.Razor.Components
+
+<_Form Version="1.2.3"></_Form>
+
 
 <PageTitle>User Form</PageTitle>
 
@@ -43,9 +45,9 @@
 </div>
 
 <div style="text-align:center;">
-    <img style="width:65%;max-width:400px;" src="_content/BluForTracker.Razor/images/qr-code.svg" />
+    <img style="width:65%;max-width:400px;" src="images/qr-code.svg" />
 </div>
-
+ 
 @code {
     [Inject]
     public required NavigationManager NavManager { get; set; }
@@ -58,5 +60,20 @@
 
     private MarkerFormModel _formData = new();
 
+    public class MarkerFormModel
+    {
+        public const int LabelMaxChars = 28;
+
+        [Required]
+        public Team? Team { get; set; }
+
+        [StringLength(LabelMaxChars, ErrorMessage = "Label must be 28 characters or less.")]
+        public string Label { get; set; } = "";
+
+        [RegularExpression("^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$", ErrorMessage = "Invalid Format")]
+        public string Color { get; set; } = "#000000";
+    }
+
     private void OnSubmit() => NavManager.NavigateTo($"/{Version}/map/{Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(_formData)))}");
 }
+ *@

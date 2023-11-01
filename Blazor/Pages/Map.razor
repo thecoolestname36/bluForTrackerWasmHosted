@@ -1,4 +1,4 @@
-﻿@page "/{version}/map/{formData}"
+﻿@* @page "/{version}/map/{formData}"
 @using System.Drawing
 @using System.Text
 @using System.Text.Json
@@ -6,6 +6,7 @@
 @using Microsoft.AspNetCore.SignalR.Client
 @using Blazored.LocalStorage
 @using BluForTracker.Shared
+@using BluForTracker.Razor.DataModels
 @implements IAsyncDisposable
 
 <PageTitle>Map</PageTitle>
@@ -91,15 +92,15 @@
     IJSObjectReference? _mapModuleJs = default!;
     GeolocationCoordinates? _currentLocation;
     InfoMarker? _myInfoMarker;
-    Form.MarkerFormModel? _formData = null;
+    MarkerFormModel? _formData = null;
     HubConnection? _hubConnection;
     ConcurrentDictionary<string, Marker> _markers = new();
 
     protected override void OnParametersSet()
     {
         base.OnParametersSet();
-        _formData = JsonSerializer.Deserialize<Form.MarkerFormModel>(Encoding.UTF8.GetString(Convert.FromBase64String(FormData))) ?? new Form.MarkerFormModel();
-        _formData.Label = _formData.Label[..Math.Min(Form.MarkerFormModel.LabelMaxChars, _formData.Label.Length)];
+        _formData = JsonSerializer.Deserialize<MarkerFormModel>(Encoding.UTF8.GetString(Convert.FromBase64String(FormData))) ?? new MarkerFormModel();
+        _formData.Label = _formData.Label[..Math.Min(MarkerFormModel.LabelMaxChars, _formData.Label.Length)];
         try
         {
             ColorTranslator.FromHtml(_formData.Color);
@@ -348,3 +349,4 @@
 
     #endregion
 }
+ *@

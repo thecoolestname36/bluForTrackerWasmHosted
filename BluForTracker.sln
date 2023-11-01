@@ -5,9 +5,13 @@ VisualStudioVersion = 17.7.34018.315
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BluForTracker.Server", "Server\BluForTracker.Server.csproj", "{89513B9F-5D0F-405D-9933-80A9DF8B13EB}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BluForTracker.Client", "Client\BluForTracker.Client.csproj", "{72881A59-8B29-4E75-A0C1-8AD7B3205B04}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BluForTracker.Shared", "Shared\BluForTracker.Shared.csproj", "{14D2DDED-46F0-4C45-A0FF-1D2F1A6A8489}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BluForTracker.Client.Blazor", "Blazor\BluForTracker.Client.Blazor.csproj", "{72881A59-8B29-4E75-A0C1-8AD7B3205B04}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BluForTracker.Client.MAUI", "MAUI\BluForTracker.Client.MAUI.csproj", "{57194510-61C0-4229-B2E4-9DCE62AE9314}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BluForTracker.Client.Shared", "Client\BluForTracker.Client.Shared.csproj", "{06F18EB8-3560-46FD-A196-02E8FAAE6EB6}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -27,6 +31,16 @@ Global
 		{14D2DDED-46F0-4C45-A0FF-1D2F1A6A8489}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{14D2DDED-46F0-4C45-A0FF-1D2F1A6A8489}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{14D2DDED-46F0-4C45-A0FF-1D2F1A6A8489}.Release|Any CPU.Build.0 = Release|Any CPU
+		{06F18EB8-3560-46FD-A196-02E8FAAE6EB6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{06F18EB8-3560-46FD-A196-02E8FAAE6EB6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{06F18EB8-3560-46FD-A196-02E8FAAE6EB6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{06F18EB8-3560-46FD-A196-02E8FAAE6EB6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{57194510-61C0-4229-B2E4-9DCE62AE9314}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{57194510-61C0-4229-B2E4-9DCE62AE9314}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{57194510-61C0-4229-B2E4-9DCE62AE9314}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
+		{57194510-61C0-4229-B2E4-9DCE62AE9314}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{57194510-61C0-4229-B2E4-9DCE62AE9314}.Release|Any CPU.Build.0 = Release|Any CPU
+		{57194510-61C0-4229-B2E4-9DCE62AE9314}.Release|Any CPU.Deploy.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
