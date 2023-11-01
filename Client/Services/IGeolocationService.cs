@@ -1,4 +1,4 @@
-namespace BluForTracker.Razor.Services;
+namespace BluForTracker.Client.Shared.Services;
 
 public class IGeolocationService {
 	

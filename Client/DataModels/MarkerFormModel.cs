@@ -1,8 +1,7 @@
-﻿
-using BluForTracker.Shared;
+﻿using BluForTracker.Shared;
 using System.ComponentModel.DataAnnotations;
 
-namespace BluForTracker.Razor.DataModels;
+namespace BluForTracker.Client.Shared.DataModels;
 public class MarkerFormModel
 {
     public const int LabelMaxChars = 28;
