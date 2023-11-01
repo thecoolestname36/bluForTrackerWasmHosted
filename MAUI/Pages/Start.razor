@@ -1,0 +1,8 @@
+@page "/"
+@inject NavigationManager Nav
+
+<button @onclick="StartClicked">Lets go!!!</button>
+
+@code {
+    void StartClicked() => Nav.NavigateTo("/setup");
+}

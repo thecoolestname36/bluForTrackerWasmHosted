@@ -1,0 +1,23 @@
+﻿@page "/"
+@using BluForTracker.Client.Shared.Services;
+@inject NavigationManager Nav
+
+<h3>Start</h3>
+
+<button @onclick="StartClicked">Lets go!!!</button>
+
+@code {
+
+    [Inject]
+    public required IGeolocationService GeolocationService { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+        if (firstRender)
+        {
+            await GeolocationService.Init();        }
+    }
+
+    void StartClicked() => Nav.NavigateTo("/setup");
+}

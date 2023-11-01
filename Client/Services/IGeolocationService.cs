@@ -1,5 +1,8 @@
-namespace BluForTracker.Client.Shared.Services;
+﻿namespace BluForTracker.Client.Shared.Services;
 
-public class IGeolocationService {
-	
+public interface IGeolocationService
+{
+    Task Init();
+
+    Task Log(string log);
 }
