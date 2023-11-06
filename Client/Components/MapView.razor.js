@@ -3,15 +3,15 @@ export class MapModule {
     infoMarkers = [];
     map = null; // This property will hold the map instance
     dotNetReference = null;
-    firstLoad = true;
     isGoogleMapsApiLoading() {
+        //console.info("isGoogleMapsApiLoading", window.mapModule.loading);
         return window.mapModule.loading;
     }
     googleMapClickListener(mapsMouseEvent) {
-        //console.info("googleMapClickListener", mapsMouseEvent);
+        //console.info("googleMapClickListener", mapsMouseEvent.latLng);
         let message = prompt("OK - Send the marker.\nCancel - Abort.\n * A message is optional and not required *", "");
         if(message != null) {
-            this.dotNetReference.invokeMethodAsync("UpdateMyInfoMarker", message, mapsMouseEvent.latLng.lat(), mapsMouseEvent.latLng.lng());
+            this.dotNetReference.invokeMethodAsync("BroadcastInfoMarker", message, mapsMouseEvent.latLng.lat(), mapsMouseEvent.latLng.lng());
         }
     }
     addListenerOnceMapIdle(ref) {
@@ -31,39 +31,6 @@ export class MapModule {
             delete this.infoMarkers[i];
         }
         window.mapModule.map.addListener("click", (mapsMouseEvent) => this.googleMapClickListener(mapsMouseEvent));
-        google.maps.event.addListenerOnce(window.mapModule.map, 'idle', () => this.watchPosition());
-    }
-    watchPositionSuccess(position) {
-        //console.info("watchPositionSuccess", position);
-        if(this.firstLoad) {
-            this.firstLoad = false;
-            this.setCenter(position.coords.latitude, position.coords.longitude);
-        }
-        this.dotNetReference.invokeMethodAsync("UpdateCurrentPosition", position.coords.latitude, position.coords.longitude);
-    }
-    watchPositionError(error) {
-        //console.info("watchPositionError", error);
-        this.firstLoad = true;
-        navigator.geolocation.clearWatch(window.mapModule.positionWatch);
-        if(error.code == GeolocationPositionError.PERMISSION_DENIED) {
-            alert("Location permission denied. Please allow location access.");
-            this.dotNetReference.invokeMethodAsync("UpdateCurrentPositionError");
-            return;
-        }
-        this.watchPosition();
-    }
-    watchPosition() {
-        //console.info("watchPosition");
-        this.loadingState = -1;
-        this.firstLoad = true;
-        if(window.mapModule.positionWatch != null) {
-            navigator.geolocation.clearWatch(window.mapModule.positionWatch);
-        }
-        window.mapModule.positionWatch = navigator.geolocation.watchPosition(
-            (position) => this.watchPositionSuccess(position),
-            (error) => this.watchPositionError(error), {
-            enableHighAccuracy: true
-        });
     }
     syncMarkers(newMarkers) {
         //console.info("syncMarkers", newMarkers);
@@ -93,9 +60,12 @@ export class MapModule {
                 fontWeight: "bold"
 
             });
+            // Might need to move this back down?
+            this.markers[marker.id].setMap(window.mapModule.map);
         }
-        this.markers[marker.id].setPosition({ lat: marker.latitude, lng: marker.longitude });
-        this.markers[marker.id].setMap(window.mapModule.map);
+        this.markers[marker.id].setPosition({ lat: marker.spike.latitude, lng: marker.spike.longitude });
+        
+        //console.info("receiveMarker - done");
     }
     removeMarker(key) {
         //console.info("removeMarker", key);
@@ -120,7 +90,7 @@ export class MapModule {
             this.infoMarkers[infoMarker.id] = new google.maps.InfoWindow();
             google.maps.event.addListener(this.infoMarkers[infoMarker.id], 'closeclick', () => this.googleMapsCloseClickEvent(infoMarker.id));
         }
-        this.infoMarkers[infoMarker.id].setPosition({ lat: infoMarker.latitude, lng: infoMarker.longitude });
+        this.infoMarkers[infoMarker.id].setPosition({ lat: infoMarker.spike.latitude, lng: infoMarker.spike.longitude });
 
         // Step 1: Parse the ISO 8601 string
         const dateObject = new Date(infoMarker.createdOn);
@@ -145,6 +115,7 @@ export class MapModule {
         delete this.infoMarkers[key];
     }
     setCenter(lat, lng) {
+        //console.info("setCenter", lat, lng);
         window.mapModule.map.setCenter({ lat: lat, lng: lng });
         window.mapModule.map.setZoom(16.0);
     }

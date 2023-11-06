@@ -2,20 +2,18 @@
 
     <PropertyGroup>
         <TargetFrameworks>net7.0-android</TargetFrameworks>
-        <!-- Uncomment to also build the tizen app. You will need to install tizen by following this: https://github.com/Samsung/Tizen.NET -->
-        <!-- <TargetFrameworks>$(TargetFrameworks);net7.0-tizen</TargetFrameworks> -->
         <OutputType>Exe</OutputType>
         <RootNamespace>MAUI</RootNamespace>
         <UseMaui>true</UseMaui>
         <SingleProject>true</SingleProject>
         <ImplicitUsings>enable</ImplicitUsings>
         <EnableDefaultCssItems>false</EnableDefaultCssItems>
-
+        <Nullable>enable</Nullable>
         <!-- Display name -->
         <ApplicationTitle>MAUI</ApplicationTitle>
 
         <!-- App Identifier -->
-        <ApplicationId>com.companyname.maui</ApplicationId>
+        <ApplicationId>com.sradzone.blufortracker</ApplicationId>
         <ApplicationIdGuid>45772D52-9F1A-4B01-B9EC-CBEE72A58542</ApplicationIdGuid>
 
         <!-- Versions -->

@@ -1,0 +1,10 @@
+.edit-form {
+	max-width: 500px;
+	margin: auto;
+}
+.submit-btn-container {
+	text-align: center;
+}
+.submit-btn {
+	width:220px;
+}

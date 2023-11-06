@@ -3,11 +3,14 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <title>MAUI</title>
+    <title>BluForTracker</title>
     <base href="/" />
-    <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css" />
     <link href="css/app.css" rel="stylesheet" />
-    <link href="MAUI.styles.css" rel="stylesheet" />
+    <!-- Include common shared CSS code -->
+    <link href="_content/BluForTracker.Client.Shared/css/client.css" rel="stylesheet" />
+    <link href="_content/BluForTracker.Client.Shared/css/bulma.min.css?v=0_9_4" rel="stylesheet" />
+    <!-- CSS isolation the razor css files that also come from shared RCLs -->
+    <link href="BluForTracker.Client.MAUI.styles.css" rel="stylesheet">
 </head>
 
 <body>
@@ -22,7 +25,21 @@
         <a class="dismiss">🗙</a>
     </div>
 
+
     <script src="_framework/blazor.webview.js" autostart="false"></script>
+
+
+    <script>
+        window.mapModule = {
+            map: null,
+            loading: true,
+            mapsCallback: function () {
+                window.mapModule.loading = false;
+            }
+        };
+    </script>
+    <script async src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD7sn_0jeQWizxOxNLQFEUiEXOMd389c5k&libraries=places&callback=window.mapModule.mapsCallback"></script>
+
 
 </body>
 

@@ -1,0 +1,56 @@
+﻿@using BluForTracker.Client.Shared.Services
+
+<div id="main-view-container">
+    <table id="button-row">
+        <tr>
+            <td>
+                <button class="main-view-button @(_currentTab == Tab.Map ? "main-view-button-selected" : "")" @onclick="() => ChangeTab(Tab.Map)">Map</button>
+            </td>
+            <td>
+                <button class="main-view-button @(_currentTab == Tab.Teams ? "main-view-button-selected" : "")" @onclick="() => ChangeTab(Tab.Teams)">Teams</button>
+            </td>
+            <td>
+                <button class="main-view-button @(_currentTab == Tab.Settings ? "main-view-button-selected" : "")" @onclick="() => ChangeTab(Tab.Settings)">Settings</button>
+            </td>
+        </tr>
+    </table>
+    <div id="main-view">
+        @switch(_currentTab) {
+            case Tab.Teams:
+                <div class="tab-view-container">
+                    <TeamsView></TeamsView>
+                </div>
+                break;
+            case Tab.Settings:
+                <div class="tab-view-container">
+                    <SettingsView OnValidSubmitCallback="() => ChangeTab(Tab.Map)"></SettingsView>
+                </div>
+                break;
+            default:
+                break;
+        }
+        <div id="map-view-container" class="@(_currentTab == Tab.Map ? "" : "map-view-container-open-tab")">
+            <MapView></MapView>
+        </div>
+    </div>
+</div>
+
+@code {
+    enum Tab
+    {
+        Map,
+        Settings,
+        Teams
+    }
+
+    [Inject] public required AppStateService AppState { get; set; }
+
+    Tab _currentTab = Tab.Map;
+    void ChangeTab(Tab tab) => _currentTab = (AppState.User.Label?.Length ?? 0) == 0 ? Tab.Settings : tab;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        ChangeTab(Tab.Map);
+    }
+}

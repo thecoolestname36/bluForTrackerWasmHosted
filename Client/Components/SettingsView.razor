@@ -1,0 +1,142 @@
+﻿@page "/setup"
+@namespace BluForTracker.Client.Shared.Components
+@implements IDisposable
+@using System.Text
+@using System.Text.Json
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Components.Forms
+@using BluForTracker.Client.Shared.Services
+@using BluForTracker.Shared
+@using Microsoft.JSInterop;
+
+<div class="container">
+
+    <section class="section">
+        <h1 class="title">User Details</h1>
+        <EditForm Model="@_formData" OnValidSubmit="OnValidSubmit" class="edit-form">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <div class="field">
+                <label for="label" class="label is-medium">Username (Max @MarkerFormModel.LabelMaxChars characters):</label>
+                <div class="control">
+                    <InputText @bind-Value="_formData.Label" id="label" class="input is-medium" placeholder="Please enter a username" required />
+                </div>
+            </div>
+            <div class="field">
+                <label for="color" class="label is-medium">Marker Color:</label>
+                <div class="control">
+                    <input type="color" @bind="_formData.Color" id="color" class="input is-medium" style="width:60px;height:60px;" required />
+                </div>
+            </div>
+            <div class="submit-btn-container">
+                <button type="submit" class="button is-success is-medium submit-btn">Save</button>
+            </div>
+        </EditForm>
+    </section>
+
+    <section class="section">
+        <h1 class="title">Status</h1>
+        <h2 class="subtitle">
+            Dashboard for showing application status.
+        </h2>
+        <table class="table is-bordered">
+            <thead>
+                <tr>
+                    <th>Location Status</th>
+                    <th>Connection Status</th>
+                    <th>Connection ID</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><input @ref="_geolocationStatusRef" disabled /></td>
+                    <td><input @ref="_hubConnectionStatusRef" disabled /></td>
+                    <td><input @ref="_hubConnectionIdRef" disabled /></td>
+                </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <section class="section">
+        <h1 class="title">Share</h1>
+        <h2 class="subtitle">
+            Get some information about how to get this app.
+        </h2>
+        <div style="text-align:center;">
+            <img style="width:65%;max-width:400px;" src="_content/BluForTracker.Client.Shared/images/qr-code.svg" />
+        </div>
+    </section>
+
+</div>
+
+@code {
+    [Inject] public required SignalRHubConnectionService HubService { get; set; }
+    [Inject] public required IGeolocationService GeolocationService { get; set; }
+    [Inject] public required AppStateService AppState { get; set; }
+    [Inject] public required IJSRuntime JSRuntime { get; set; }
+    [Parameter] public EventCallback OnValidSubmitCallback { get; set; } = EventCallback.Empty;
+    ElementReference _geolocationStatusRef;
+    ElementReference _hubConnectionStatusRef;
+    ElementReference _hubConnectionIdRef;
+    private MarkerFormModel _formData = new();
+    private IJSObjectReference? _collocatedJs;
+
+    class MarkerFormModel
+    {
+        public const int LabelMaxChars = 28;
+
+        [StringLength(LabelMaxChars, ErrorMessage = "Label must be 28 characters or less.")]
+        public string Label { get; set; } = "";
+
+        [RegularExpression("^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$", ErrorMessage = "Invalid Format")]
+        public string Color { get; set; } = "#000000";
+    }
+
+    protected override void OnParametersSet()
+    {
+        base.OnParametersSet();
+        if (AppState.User != null)
+        {
+            _formData.Label = AppState.User.Label;
+            _formData.Color = AppState.User.Color;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+        if (firstRender)
+        {
+            _collocatedJs = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./_content/BluForTracker.Client.Shared/Components/SettingsView.razor.js");
+            StatusLoop();
+        }
+    }
+
+    PeriodicTimer? _statusTimer;
+    async void StatusLoop()
+    {
+        _statusTimer ??= new(TimeSpan.FromSeconds(1));
+        while(await _statusTimer.WaitForNextTickAsync())
+        {
+            if (_collocatedJs != null)
+            {
+                await _collocatedJs.InvokeVoidAsync("setElementValue", _geolocationStatusRef, (await GeolocationService.Status()) ?? "Unknown");
+                await _collocatedJs.InvokeVoidAsync("setElementValue", _hubConnectionStatusRef, HubService.Status());
+                await _collocatedJs.InvokeVoidAsync("setElementValue", _hubConnectionIdRef, AppState.User?.Marker?.Id ?? "Unknown");
+            }
+        }
+    }
+
+    private async Task OnValidSubmit()
+    {
+        AppState.User.Label = _formData.Label;
+        AppState.User.Color = _formData.Color;
+        await OnValidSubmitCallback.InvokeAsync();
+    }
+
+    public void Dispose()
+    {
+        _statusTimer?.Dispose();
+    }
+}
