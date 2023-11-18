@@ -8,12 +8,12 @@ export class GeolocationService {
         return this.status;
     }
     watchPositionSuccess(position) {
-        console.info("watchPositionSuccess", position);
+        //console.info("watchPositionSuccess", position);
         this.dotNetReference.invokeMethodAsync("UpdateCurrentPosition", position.coords.latitude, position.coords.longitude);
         this.status = 3;
     }
     watchPositionError(error) {
-        console.info("watchPositionError", error);
+        //console.info("watchPositionError", error);
         navigator.geolocation.clearWatch(this.positionWatch);
         this.status = -1;
         if(error.code == GeolocationPositionError.PERMISSION_DENIED) {
@@ -24,7 +24,7 @@ export class GeolocationService {
         this.dotNetReference.invokeMethodAsync("UpdateCurrentPositionError");
     }
     watchPosition() {
-        console.info("watchPosition");
+        //console.info("watchPosition");
         this.status = 1;
         if(this.positionWatch != null) {
             navigator.geolocation.clearWatch(this.positionWatch);
@@ -45,6 +45,6 @@ export class GeolocationService {
 }
 
 export function CreateGeolocationService(dotNetReference) {
-    console.info("CreateGeolocationService");
+    //console.info("CreateGeolocationService");
     return new GeolocationService(dotNetReference);
 }

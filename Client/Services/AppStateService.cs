@@ -4,5 +4,6 @@ namespace BluForTracker.Client.Shared.Services;
 
 public class AppStateService
 {
-    public User User { get; } = new User();
+    private User User = new();
+    public User GetUser() => User;
 }

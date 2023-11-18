@@ -13,6 +13,6 @@ public enum GeolocationStatus {
 public interface IGeolocationService
 {
     Task Init();
-    Task<Spike?> GetCurrentLocation();
+    Task<MapMarker?> GetCurrentLocation();
     Task<string?> Status();
 }

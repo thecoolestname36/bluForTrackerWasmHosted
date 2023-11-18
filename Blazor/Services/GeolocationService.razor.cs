@@ -6,7 +6,7 @@ namespace BluForTracker.Client.Blazor.Services;
 
 public partial class GeolocationService : IGeolocationService, IAsyncDisposable
 {
-    private Spike? _currentLocation;
+    private MapMarker? _currentLocation;
     private readonly IJSRuntime? _jSRuntime;
     private IJSRuntime GetJSRuntime() => _jSRuntime ?? throw new NullReferenceException(nameof(JSRuntime));
     private IJSObjectReference? _geolocationServiceJS;
@@ -24,24 +24,24 @@ public partial class GeolocationService : IGeolocationService, IAsyncDisposable
         await _geolocationServiceJS.InvokeVoidAsync("watchPosition");
     }
 
-    public async Task<Spike?> GetCurrentLocation()
+    public async Task<MapMarker?> GetCurrentLocation()
     {
         await Task.CompletedTask;
         if (_currentLocation == null) return null;
-        return new Spike
+        return new MapMarker
         {
             Latitude = _currentLocation.Latitude,
             Longitude = _currentLocation.Longitude,
-            UpdatedOn = _currentLocation.UpdatedOn,
+            Timestamp = _currentLocation.Timestamp,
         };
     }
 
     [JSInvokable]
-    public void UpdateCurrentPosition(double lat, double lng) => _currentLocation = new Spike
+    public void UpdateCurrentPosition(double lat, double lng) => _currentLocation = new MapMarker
     {
         Latitude = lat,
         Longitude = lng,
-        UpdatedOn = DateTimeOffset.UtcNow,
+        Timestamp = DateTimeOffset.UtcNow,
     };
 
     [JSInvokable]

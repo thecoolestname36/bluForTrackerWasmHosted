@@ -1,5 +1,8 @@
 ﻿@using BluForTracker.Client.Shared.Services
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
 
+<div @ref="_screenLockOverlayElement" id="screen-lock-overlay" class="display-none"></div>
 <div id="main-view-container">
     <table id="button-row">
         <tr>
@@ -12,6 +15,9 @@
             <td>
                 <button class="main-view-button @(_currentTab == Tab.Settings ? "main-view-button-selected" : "")" @onclick="() => ChangeTab(Tab.Settings)">Settings</button>
             </td>
+            <td @ref="_lockScreenButtonContainerElement" class="width-90 display-none">
+                <button @ref="_lockScreenButtonElement" class="main-view-button" @onclick="() => LockScreen()"><img alt="Lock" src="_content/BluForTracker.Client.Shared/images/lock.svg" /></button>
+            </td>
         </tr>
     </table>
     <div id="main-view">
@@ -23,14 +29,14 @@
                 break;
             case Tab.Settings:
                 <div class="tab-view-container">
-                    <SettingsView OnValidSubmitCallback="() => ChangeTab(Tab.Map)"></SettingsView>
+                    <SettingsView OnValidSubmitCallback="OnValidSubmitCallback"></SettingsView>
                 </div>
                 break;
             default:
                 break;
         }
         <div id="map-view-container" class="@(_currentTab == Tab.Map ? "" : "map-view-container-open-tab")">
-            <MapView></MapView>
+            <MapView @ref="_mapViewRef"></MapView>
         </div>
     </div>
 </div>
@@ -44,13 +50,48 @@
     }
 
     [Inject] public required AppStateService AppState { get; set; }
+    [Inject] public required IJSRuntime JSRuntime { get; set; }
 
     Tab _currentTab = Tab.Map;
-    void ChangeTab(Tab tab) => _currentTab = (AppState.User.Label?.Length ?? 0) == 0 ? Tab.Settings : tab;
+    void ChangeTab(Tab tab) => _currentTab = AppState.GetUser().IsValid() ? tab : Tab.Settings;
+    IJSObjectReference? _mainModuleJs = default!;
+    ElementReference? _lockScreenButtonContainerElement = default!;
+    ElementReference? _lockScreenButtonElement = default!;
+    ElementReference? _screenLockOverlayElement = default!;
+    MapView _mapViewRef;
+
+    void LockScreen()
+    {
+        _mainModuleJs.InvokeVoidAsync("requestFullscreen");
+    }
+
+    void OnValidSubmitCallback()
+    {
+        _mapViewRef?.UserUpdated();
+        ChangeTab(Tab.Map);
+    }
 
     protected override void OnInitialized()
     {
         base.OnInitialized();
         ChangeTab(Tab.Map);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+        if(firstRender)
+        {
+            var collocatedJs = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./_content/BluForTracker.Client.Shared/Components/MainView.razor.js");
+            _mainModuleJs = await collocatedJs.InvokeAsync<IJSObjectReference>("CreateMainModule");
+            await _mainModuleJs.InvokeAsync<bool>("tryAllowFullscreen", _lockScreenButtonContainerElement, _lockScreenButtonElement, _screenLockOverlayElement);        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if(_mainModuleJs != null)
+        {
+            await _mainModuleJs.DisposeAsync();
+        }
     }
 }

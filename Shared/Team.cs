@@ -1,12 +1,8 @@
-﻿namespace BluForTracker.Shared;
+﻿using System.Collections.Concurrent;
 
-public enum Team
-{
-    None,
-    Cat_Commandos,
-    Eagles,
-    Foxes,
-    Honey_Badgers,
-    Pickles,
-    Whiskey
+namespace BluForTracker.Shared;
+
+public record Team {
+    public required Guid Id { get; init; }
+    public required string Name { get; init; }
 }

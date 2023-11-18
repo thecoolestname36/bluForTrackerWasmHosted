@@ -18,9 +18,9 @@
             <ValidationSummary />
 
             <div class="field">
-                <label for="label" class="label is-medium">Username (Max @MarkerFormModel.LabelMaxChars characters):</label>
+                <label for="username" class="username is-medium">Username (Max @MarkerFormModel.UsernameMaxChars characters):</label>
                 <div class="control">
-                    <InputText @bind-Value="_formData.Label" id="label" class="input is-medium" placeholder="Please enter a username" required />
+                    <InputText @bind-Value="_formData.Username" id="username" class="input is-medium" placeholder="Please enter a username" required />
                 </div>
             </div>
             <div class="field">
@@ -84,10 +84,10 @@
 
     class MarkerFormModel
     {
-        public const int LabelMaxChars = 28;
+        public const int UsernameMaxChars = 28;
 
-        [StringLength(LabelMaxChars, ErrorMessage = "Label must be 28 characters or less.")]
-        public string Label { get; set; } = "";
+        [StringLength(UsernameMaxChars, ErrorMessage = "Username must be 28 characters or less.")]
+        public string Username { get; set; } = "";
 
         [RegularExpression("^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$", ErrorMessage = "Invalid Format")]
         public string Color { get; set; } = "#000000";
@@ -96,11 +96,8 @@
     protected override void OnParametersSet()
     {
         base.OnParametersSet();
-        if (AppState.User != null)
-        {
-            _formData.Label = AppState.User.Label;
-            _formData.Color = AppState.User.Color;
-        }
+        _formData.Username = AppState.GetUser().Username;
+        _formData.Color = AppState.GetUser().Color;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -123,15 +120,16 @@
             {
                 await _collocatedJs.InvokeVoidAsync("setElementValue", _geolocationStatusRef, (await GeolocationService.Status()) ?? "Unknown");
                 await _collocatedJs.InvokeVoidAsync("setElementValue", _hubConnectionStatusRef, HubService.Status());
-                await _collocatedJs.InvokeVoidAsync("setElementValue", _hubConnectionIdRef, AppState.User?.Marker?.Id ?? "Unknown");
+                await _collocatedJs.InvokeVoidAsync("setElementValue", _hubConnectionIdRef, AppState.GetUser()?.ConnectionId ?? "Unknown");
             }
         }
     }
 
     private async Task OnValidSubmit()
     {
-        AppState.User.Label = _formData.Label;
-        AppState.User.Color = _formData.Color;
+        var user = AppState.GetUser();
+        user.Username = _formData.Username;
+        user.Color = _formData.Color;
         await OnValidSubmitCallback.InvokeAsync();
     }
 

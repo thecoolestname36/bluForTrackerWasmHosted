@@ -31,7 +31,7 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
-app.MapHub<MarkerHub>(Routing.MarkerHub.Path);
+app.MapHub<MarkerHub>(Constants.MarkerHubPath);
 app.MapControllers();
 app.MapFallbackToFile("index.html");
 
