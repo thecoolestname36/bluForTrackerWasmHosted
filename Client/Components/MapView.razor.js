@@ -34,10 +34,14 @@ export class MapModule {
         this.dotNetReference.invokeMethodAsync("MapModuleSetupComplete");
     }
     receiveTeam(googleMapsInfoMarkers) {
-        //console.info("receiveTeam", googleMapsInfoMarkers);
+        console.info("receiveTeam", googleMapsInfoMarkers);
         for(let i = 0; i < this.mapMarkers.length; i++) {
             this.mapMarkers[i].setMap(null);
             delete this.mapMarkers[i];
+        }
+        for(let i = 0; i < this.infoMarkers.length; i++) {
+            this.infoMarkers[i].setMap(null);
+            delete this.infoMarkers[i];
         }
         googleMapsInfoMarkers.forEach((googleMapsInfoMarker) => this.receiveTeamMember(googleMapsInfoMarker));
     }
@@ -80,31 +84,33 @@ export class MapModule {
             this.mapMarkers[connectionId].setPosition({ lat: mapMarker.latitude, lng: mapMarker.longitude });
         }
     }
-    //receiveInfoMarker(infoMarker) {
-    //    //console.info("receiveInfoMarker", infoMarker);
-    //    if(!this.infoMarkers.hasOwnProperty(infoMarker.id)) {
-    //        this.infoMarkers[infoMarker.id] = new google.maps.InfoWindow();
-    //        google.maps.event.addListener(this.infoMarkers[infoMarker.id], 'closeclick', () => this.googleMapsCloseClickEvent(infoMarker.id));
-    //    }
-    //    this.infoMarkers[infoMarker.id].setPosition({ lat: infoMarker.latitude, lng: infoMarker.longitude });
+    receiveInfoMarker(connectionId, username, color, infoMarker) {
+        console.info("receiveInfoMarker", connectionId, username, color, infoMarker);
+        if(!this.infoMarkers.hasOwnProperty(connectionId)) {
+            this.infoMarkers[connectionId] = new google.maps.InfoWindow();
+            //google.maps.event.addListener(this.infoMarkers[infoMarker.id], 'closeclick', () => this.googleMapsCloseClickEvent(infoMarker.id));
+        }
+        this.infoMarkers[connectionId].setPosition({ lat: infoMarker.latitude, lng: infoMarker.longitude });
 
-    //    // Step 1: Parse the ISO 8601 string
-    //    const dateObject = new Date(infoMarker.createdOn);
+        // Step 1: Parse the ISO 8601 string
+        const dateObject = new Date(infoMarker.timestamp);
 
-    //    // Step 2: Extract the hour and minute components
-    //    const hours = dateObject.getHours();
-    //    const minutes = dateObject.getMinutes();
+        // Step 2: Extract the hour and minute components
+        const hours = dateObject.getHours();
+        const minutes = dateObject.getMinutes();
 
-    //    // Step 3: Format the time
-    //    const amOrPm = hours >= 12 ? "PM" : "AM";
-    //    const formattedHours = hours % 12 || 12; // Convert 0 to 12 for 12-hour format
+        // Step 3: Format the time
+        const amOrPm = hours >= 12 ? "PM" : "AM";
+        const formattedHours = hours % 12 || 12; // Convert 0 to 12 for 12-hour format
 
-    //    // Step 4: Create the date time format
-    //    const dateTimeFormat = `${formattedHours}:${minutes.toString().padStart(2, "0")} ${amOrPm}`;
+        // Step 4: Create the date time format
+        const dateTimeFormat = `${formattedHours}:${minutes.toString().padStart(2, "0")} ${amOrPm}`;
 
-    //    this.infoMarkers[infoMarker.id].setContent("<h6 style='color:" + infoMarker.labelColor + "'>" + infoMarker.label + "</h6>" + infoMarker.message + dateTimeFormat);
-    //    this.infoMarkers[infoMarker.id].open(window.mapModule.map);
-    //}
+        this.infoMarkers[connectionId].setContent("<h6 style='color:" + color + "'>" + username + "</h6>" + infoMarker.message + dateTimeFormat);
+        this.infoMarkers[connectionId].open(window.mapModule.map);
+    }
+
+
     //removeInfoMarker(key) {
     //    //console.info("removeInfoMarker", key);
     //    this.infoMarkers[key].setMap(null);
@@ -119,7 +125,7 @@ export class MapModule {
     //    newInfoMarkers.forEach((infoMarker) => this.receiveInfoMarker(infoMarker));
     //}
     googleMapsCloseClickEvent(id) {
-        //console.info("googleMapsCloseClickEvent", id);
+        console.info("googleMapsCloseClickEvent", id);
         this.dotNetReference.invokeMethodAsync("RemoveInfoMarker", id);
     }
     setCenter(lat, lng) {

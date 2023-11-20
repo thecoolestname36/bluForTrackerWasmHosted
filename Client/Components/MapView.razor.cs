@@ -2,9 +2,8 @@
 using BluForTracker.Shared;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.Extensions.Primitives;
 using Microsoft.JSInterop;
-using System.Collections.Concurrent;
-using System.Text.Json;
 
 namespace BluForTracker.Client.Shared.Components;
 
@@ -14,25 +13,10 @@ public partial class MapView : IAsyncDisposable
     [Inject] public required IJSRuntime JSRuntime { get; set; }
     [Inject] public required IAppLocalStorageService LocalStorage { get; set; }
     [Inject] public required IGeolocationService GeolocationService { get; set; }
-    [Inject] public required SignalRHubConnectionService SignalRHubConnectionService { get; set; }
+    [Inject] public required SignalRHubConnectionService HubConnectionService { get; set; }
     [Inject] public required AppStateService AppState { get; set; }
 
     IJSObjectReference? _mapModuleJs = default!;
-
-    public async Task UserUpdated()
-    {
-        var hubConnection = await GetHubConnection();
-        if(hubConnection.State == HubConnectionState.Connected)
-        {
-            await hubConnection.SendAsync("UpdateUser", AppState.GetUser());
-        }
-    }
-
-    protected override async Task OnParametersSetAsync()
-    {
-        await base.OnParametersSetAsync();
-        await GetHubConnection();
-    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -44,6 +28,42 @@ public partial class MapView : IAsyncDisposable
             _mapModuleJs = await collocatedJs.InvokeAsync<IJSObjectReference>("CreateMapModule");
             await MapLoadLoop();
         }
+    }
+
+    public void OnReceiveConnectionId(string connectionId)
+    {
+        AppState.GetUser().ConnectionId = connectionId;
+        // Maybe do some stuff here like check storage for an existing connection ID and tell the server to update it
+    }
+
+    public async Task OnReceiveTeam(List<User> users)
+    {
+        if(_mapModuleJs == null) return;
+        await _mapModuleJs.InvokeVoidAsync("receiveTeam", users.Select(user => user.ToGoogleMapMarker()).Where(user => user != null));
+    }
+
+    public async Task OnReceiveTeamMember(User user)
+    {
+        var mapMarker = user.ToGoogleMapMarker();
+        if(_mapModuleJs == null || mapMarker == null) return;
+        await _mapModuleJs.InvokeVoidAsync("receiveTeamMember", mapMarker);
+    }
+    public async Task OnReceiveMapMarker(string connectionId, MapMarker mapMarker)
+    {
+        if(_mapModuleJs == null) return;
+        await _mapModuleJs.InvokeVoidAsync("receiveMapMarker", connectionId, mapMarker);
+    }
+
+    public async Task OnRemoveTeamMember(string connectionId)
+    {
+        if(_mapModuleJs == null) return;
+        await _mapModuleJs.InvokeVoidAsync("removeTeamMember", connectionId);
+    }
+
+    public async Task OnReceiveInfoMarker(string connectionId, string username, string color, InfoMarker infoMarker)
+    {
+        if(_mapModuleJs == null) return;
+        await _mapModuleJs.InvokeVoidAsync("receiveInfoMarker", connectionId, username, color, infoMarker);
     }
 
     PeriodicTimer? _mapLoadTimer;
@@ -64,12 +84,24 @@ public partial class MapView : IAsyncDisposable
     [JSInvokable]
     public async Task MapModuleSetupComplete()
     {
-        var hubConnection = await GetHubConnection();
+        var hubConnection = await HubConnectionService.GetHubConnection();
         if(hubConnection.State == HubConnectionState.Connected)
         {
             await hubConnection.SendAsync("JoinTeam", AppState.GetUser().TeamId);
             MyLocationLoop();
         }
+    }
+
+    [JSInvokable]
+    public async Task BroadcastInfoMarker(string message, double lat, double lng)
+    {
+        var hubConnection = await HubConnectionService.GetHubConnection();
+        if(hubConnection.State == HubConnectionState.Connected) await hubConnection.SendAsync("BroadcastInfoMarker", new InfoMarker()
+        {
+            Latitude = lat,
+            Longitude = lng,
+            Message = string.IsNullOrEmpty(message) ? "" : message + "<br/>",
+        });
     }
 
     MapMarker? _lastSentLocation;
@@ -84,7 +116,7 @@ public partial class MapView : IAsyncDisposable
             var location = await GeolocationService.GetCurrentLocation();
             if(location == null || _lastSentLocation != null && _lastSentLocation.Timestamp == location.Timestamp) continue;
 
-            var hubConnection = await GetHubConnection();
+            var hubConnection = await HubConnectionService.GetHubConnection();
             if(hubConnection.State == HubConnectionState.Connected)
             {
                 if(_lastSentLocation == null)
@@ -104,43 +136,6 @@ public partial class MapView : IAsyncDisposable
         }
     }
 
-    public async Task<HubConnection> GetHubConnection()
-    {
-        if(SignalRHubConnectionService.HubConnection == null)
-        {
-            var hubConnection = await SignalRHubConnectionService.Init();
-            hubConnection.On<string>("ReceiveConnectionId", async (connectionId) => 
-            {
-                AppState.GetUser().ConnectionId = connectionId;
-                // Maybe do some stuff here like check storage for an existing connection ID and tell the server to update it
-
-            });
-            hubConnection.On<List<User>>("ReceiveTeam", async (users) => 
-            {
-                if(_mapModuleJs == null) return;
-                await _mapModuleJs.InvokeVoidAsync("receiveTeam", users.Select(user => user.ToGoogleMapMarker()).Where(user => user != null));
-            });
-            hubConnection.On<User>("ReceiveTeamMember", async (user) => 
-            {
-                var mapMarker = user.ToGoogleMapMarker();
-                if(_mapModuleJs == null || mapMarker == null) return;
-                await _mapModuleJs.InvokeVoidAsync("receiveTeamMember", mapMarker);
-            });
-            hubConnection.On<string, MapMarker>("ReceiveMapMarker", async (connectionId, mapMarker) =>
-            {
-                if(_mapModuleJs == null) return;
-                await _mapModuleJs.InvokeVoidAsync("receiveMapMarker", connectionId, mapMarker);
-            });
-            hubConnection.On<string>("RemoveTeamMember", async (connectionId) => 
-            {
-                if(_mapModuleJs == null) return;
-                await _mapModuleJs.InvokeVoidAsync("removeTeamMember", connectionId);
-            });
-        }
-        if(SignalRHubConnectionService.HubConnection?.State == HubConnectionState.Disconnected) await SignalRHubConnectionService.HubConnection.StartAsync();
-        return SignalRHubConnectionService.HubConnection ?? throw new NullReferenceException("HubConnection was null when it should not be");
-    }
-
     async Task SetCenter(MapMarker marker) {
         if(_mapModuleJs != null) {
             await _mapModuleJs.InvokeVoidAsync("setCenter", marker.Latitude, marker.Longitude);
@@ -149,7 +144,6 @@ public partial class MapView : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        if(SignalRHubConnectionService.HubConnection != null) await SignalRHubConnectionService.HubConnection.DisposeAsync();
         if(_mapModuleJs != null)
         {
             await _mapModuleJs.DisposeAsync();
@@ -220,24 +214,6 @@ public partial class MapView : IAsyncDisposable
     //    await _mapModuleJs.InvokeVoidAsync("removeInfoMarker", key);
     //}
     //);
-
-    //[JSInvokable]
-    //public async Task BroadcastInfoMarker(string message, double lat, double lng) {
-    //    if(AppState.GetUser().Id == null) return;
-    //    var hubConnection = await GetHubConnection();
-    //    if(hubConnection.State == HubConnectionState.Connected) await hubConnection.SendAsync(Routing.MarkerHub.Server.BroadcastInfoMarker, new MessageSpike() {
-    //        Label = AppState.GetUser().Username ?? "unk",
-    //        LabelColor = AppState.GetUser().Color ?? "#000000",
-    //        Message = string.IsNullOrEmpty(message) ? "" : message + "<br/>",
-    //        Spike = new Spike
-    //        {
-    //            Latitude = lat,
-    //            Longitude = lng,
-    //            UpdatedOn = DateTimeOffset.UtcNow
-    //        }
-    //    });
-    //}
-
     //[JSInvokable]
     //public async Task RemoveInfoMarker(string key)
     //{

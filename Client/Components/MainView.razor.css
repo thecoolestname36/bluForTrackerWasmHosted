@@ -45,7 +45,7 @@
 	height: 60%;
 	overflow: auto;
 	padding: 20px;
-	border-bottom: 2px dotted #969696;
+	border-top: 2px dotted #969696;
 }
 .display-none {
 	display: none;

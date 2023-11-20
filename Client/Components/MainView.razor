@@ -1,9 +1,22 @@
 ﻿@using BluForTracker.Client.Shared.Services
+@using BluForTracker.Shared
+@using Microsoft.AspNetCore.SignalR.Client
 @using Microsoft.JSInterop
 @implements IAsyncDisposable
 
 <div @ref="_screenLockOverlayElement" id="screen-lock-overlay" class="display-none"></div>
 <div id="main-view-container">
+    <div id="main-view">
+        <div id="map-view-container" class="@(_currentTab == Tab.Map ? "" : "map-view-container-open-tab")">
+            <MapView @ref="_mapViewRef"></MapView>
+        </div>
+        <div class="@(_currentTab == Tab.Teams ? "tab-view-container" : "display-none")">
+            <TeamsView @ref="_teamsViewRef"></TeamsView>
+        </div>
+        <div class="@(_currentTab == Tab.Settings ? "tab-view-container" : "display-none")">
+            <SettingsView OnValidSubmitCallback="OnValidSubmitCallback"></SettingsView>
+        </div>
+    </div>
     <table id="button-row">
         <tr>
             <td>
@@ -20,25 +33,6 @@
             </td>
         </tr>
     </table>
-    <div id="main-view">
-        @switch(_currentTab) {
-            case Tab.Teams:
-                <div class="tab-view-container">
-                    <TeamsView></TeamsView>
-                </div>
-                break;
-            case Tab.Settings:
-                <div class="tab-view-container">
-                    <SettingsView OnValidSubmitCallback="OnValidSubmitCallback"></SettingsView>
-                </div>
-                break;
-            default:
-                break;
-        }
-        <div id="map-view-container" class="@(_currentTab == Tab.Map ? "" : "map-view-container-open-tab")">
-            <MapView @ref="_mapViewRef"></MapView>
-        </div>
-    </div>
 </div>
 
 @code {
@@ -49,43 +43,52 @@
         Teams
     }
 
+    [Inject] public required SignalRHubConnectionService HubConnectionService { get; set; }
     [Inject] public required AppStateService AppState { get; set; }
     [Inject] public required IJSRuntime JSRuntime { get; set; }
 
-    Tab _currentTab = Tab.Map;
+    Tab _currentTab = Tab.Settings;
     void ChangeTab(Tab tab) => _currentTab = AppState.GetUser().IsValid() ? tab : Tab.Settings;
     IJSObjectReference? _mainModuleJs = default!;
     ElementReference? _lockScreenButtonContainerElement = default!;
     ElementReference? _lockScreenButtonElement = default!;
     ElementReference? _screenLockOverlayElement = default!;
+    TeamsView _teamsViewRef;
     MapView _mapViewRef;
 
     void LockScreen()
     {
+        if (_mainModuleJs == null) return;
         _mainModuleJs.InvokeVoidAsync("requestFullscreen");
     }
 
-    void OnValidSubmitCallback()
-    {
-        _mapViewRef?.UserUpdated();
-        ChangeTab(Tab.Map);
-    }
-
-    protected override void OnInitialized()
-    {
-        base.OnInitialized();
-        ChangeTab(Tab.Map);
-    }
+    void OnValidSubmitCallback() => ChangeTab(Tab.Map);
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         await base.OnAfterRenderAsync(firstRender);
-        if(firstRender)
+        if (firstRender)
         {
             var collocatedJs = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./_content/BluForTracker.Client.Shared/Components/MainView.razor.js");
             _mainModuleJs = await collocatedJs.InvokeAsync<IJSObjectReference>("CreateMainModule");
-            await _mainModuleJs.InvokeAsync<bool>("tryAllowFullscreen", _lockScreenButtonContainerElement, _lockScreenButtonElement, _screenLockOverlayElement);        }
+            await _mainModuleJs.InvokeAsync<bool>("tryAllowFullscreen", _lockScreenButtonContainerElement, _lockScreenButtonElement, _screenLockOverlayElement);
+
+            var hubConnection = await HubConnectionService.GetHubConnection();
+
+            hubConnection.On<List<TeamRoster>>("ReceiveTeamRosters", _teamsViewRef.OnReceiveTeamRosters);
+            hubConnection.On("TeamRosterChanged", _teamsViewRef.OnTeamRosterChanged);
+            hubConnection.On<Guid>("JoinedTeam", _teamsViewRef.OnJoinedTeam);
+
+            hubConnection.On<string>("ReceiveConnectionId", _mapViewRef.OnReceiveConnectionId);
+            hubConnection.On<List<User>>("ReceiveTeam", _mapViewRef.OnReceiveTeam);
+            hubConnection.On<User>("ReceiveTeamMember", _mapViewRef.OnReceiveTeamMember);
+            hubConnection.On<string, MapMarker>("ReceiveMapMarker", _mapViewRef.OnReceiveMapMarker);
+            hubConnection.On<string>("RemoveTeamMember", _mapViewRef.OnRemoveTeamMember);
+            hubConnection.On<string, string, string, InfoMarker>("ReceiveInfoMarker", _mapViewRef.OnReceiveInfoMarker);
+        }
     }
+
+    
 
     public async ValueTask DisposeAsync()
     {
