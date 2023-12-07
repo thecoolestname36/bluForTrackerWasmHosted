@@ -130,6 +130,7 @@ public partial class MapView : IAsyncDisposable
                     Timestamp = location.Timestamp
                 };
                 sending = true;
+                // TODO -- Need to determine of location is within a meter, then dont send.
                 await hubConnection.SendAsync("BroadcastMapMarker", _lastSentLocation);
                 sending = false;
             }

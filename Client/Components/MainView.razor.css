@@ -1,5 +1,5 @@
 #button-row {
-	height: 7%;
+	height: 5%;
 	width: 100%;
 	table-layout: fixed;
 }
@@ -11,13 +11,14 @@
 	z-index: 300;
 }
 #main-view {
-	height: 93%;
+	height: 95%;
 }
 #map-view-container {
 	height: 100%;
 }
 #map-view-container.map-view-container-open-tab {
 	height: 40%;
+	opacity: 40%;
 }
 .main-view-button {
 	border: none;
@@ -45,7 +46,7 @@
 	height: 60%;
 	overflow: auto;
 	padding: 20px;
-	border-top: 2px dotted #969696;
+	border-bottom: 2px dotted #969696;
 }
 .display-none {
 	display: none;

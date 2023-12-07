@@ -1,23 +1,26 @@
 @using Microsoft.AspNetCore.Components.Forms
 @namespace BluForTracker.Client.Shared.Components
 
-@if (_teamRosters.Count == 0)
-{
-    <h3>Loading...</h3>
-} else
-{
-    <div class="content">
+<div class="container-fluid">
+    @if (_teamRosters.Count == 0)
+    {
+        <h3>Loading...</h3>
+    } else
+    {
         @foreach(var teamRoster in _teamRosters)
-        {   
-            <blockquote>
-                <h3>
-                    @if(AppStateService.GetUser().TeamId != teamRoster.Id)
+        {
+            <div class="row rounded-1 border border-black mb-3">
+                <div class="h5 pb-2 mb-4 text-black border-bottom border-black text-center" style="padding: 0 !important;">
+                    @if(AppStateService.GetUser().TeamId == teamRoster.Id)
                     {
-                        <button type="button" class="button is-info" @onclick="() => JoinTeamClicked(teamRoster.Id)">Join</button>
+                        @teamRoster.Name
+                    } else
+                    {
+                        <div class="d-grid gap-2">
+                            <button type="button" class="btn btn-primary" @onclick="() => JoinTeamClicked(teamRoster.Id)">Join @teamRoster.Name</button>
+                        </div>
                     }
-                    &nbsp;
-                    @teamRoster.Name
-                </h3>
+                </div>
                 <table class="table is-bordered">
                     <thead>
                         <tr>
@@ -39,27 +42,20 @@
                     }
                     </tbody>
                 </table>
-            </blockquote>
+            </div>
         }
-    </div>
-    <br /><hr /><br />
-    <div class="content">
-        <h2>Create New Team</h2>
-        <EditForm Model="_formData" OnValidSubmit="OnValidSubmit">
-            <DataAnnotationsValidator />
-            <ValidationSummary />
-
-            <div class="field">
-                <label for="teamname" class="is-medium">Team Name (Max @TeamFormModel.TeamNameMaxChars characters):</label>
-                <div class="control">
-                    <InputText @bind-Value="_formData.TeamName" id="teamname" class="input is-medium" placeholder="Please enter a team name" required />
+        
+        <div class="row">
+            <EditForm Model="_formData" OnValidSubmit="OnValidSubmit">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+                <div class="form-floating mb-3">
+                    <InputText @bind-Value="_formData.TeamName" id="teamname" class="form-control" required />
+                    <label for="teamname">Team Name (Max @TeamFormModel.TeamNameMaxChars characters)</label>
                 </div>
-            </div>
+                <button type="submit" class="btn btn-primary mb-3">Create Team</button>
+            </EditForm>
+        </div>
 
-            <div class="submit-btn-container">
-                <button type="submit" class="button is-success is-medium submit-btn">Create Team</button>
-            </div>
-        </EditForm>
-    </div>
-
-}
+    }
+</div>

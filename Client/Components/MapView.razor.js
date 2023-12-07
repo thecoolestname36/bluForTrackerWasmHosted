@@ -19,8 +19,7 @@ export class MapModule {
         this.dotNetReference = ref;
         window.mapModule.map = new google.maps.Map(document.getElementById("map"), {
             zoom: 4,
-            center: { lat: 43.0, lng: -95.0 },
-            mapTypeId: 'terrain'
+            center: { lat: 43.0, lng: -95.0 }
         });
         for(let i = 0; i < this.mapMarkers.length; i++) {
             this.mapMarkers[i].setMap(null);

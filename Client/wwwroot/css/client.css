@@ -40,7 +40,7 @@ body, #app, main, #main-view-container {
 .blazor-error-boundary::after {
 	content: "An error has occurred."
 }
-.width-90 {
-	width: 90px;
-	max-width: 90px;
+.width-60 {
+	width: 60px;
+	max-width: 60px;
 }

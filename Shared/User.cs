@@ -3,7 +3,7 @@
 public record User
 {
     public string? ConnectionId { get; set; } = null;
-    public string Username { get; set; } = "";
+    public string? Username { get; set; }
     public Guid TeamId { get; set; } = Guid.Empty;
     public bool IsActive { get; set; } = true;
     public string Color { get; set; } = string.Format("#{0:X6}", new Random().Next(0x1000000));

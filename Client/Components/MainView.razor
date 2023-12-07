@@ -6,17 +6,6 @@
 
 <div @ref="_screenLockOverlayElement" id="screen-lock-overlay" class="display-none"></div>
 <div id="main-view-container">
-    <div id="main-view">
-        <div id="map-view-container" class="@(_currentTab == Tab.Map ? "" : "map-view-container-open-tab")">
-            <MapView @ref="_mapViewRef"></MapView>
-        </div>
-        <div class="@(_currentTab == Tab.Teams ? "tab-view-container" : "display-none")">
-            <TeamsView @ref="_teamsViewRef"></TeamsView>
-        </div>
-        <div class="@(_currentTab == Tab.Settings ? "tab-view-container" : "display-none")">
-            <SettingsView OnValidSubmitCallback="OnValidSubmitCallback"></SettingsView>
-        </div>
-    </div>
     <table id="button-row">
         <tr>
             <td>
@@ -28,11 +17,22 @@
             <td>
                 <button class="main-view-button @(_currentTab == Tab.Settings ? "main-view-button-selected" : "")" @onclick="() => ChangeTab(Tab.Settings)">Settings</button>
             </td>
-            <td @ref="_lockScreenButtonContainerElement" class="width-90 display-none">
+            <td @ref="_lockScreenButtonContainerElement" class="width-60 display-none">
                 <button @ref="_lockScreenButtonElement" class="main-view-button" @onclick="() => LockScreen()"><img alt="Lock" src="_content/BluForTracker.Client.Shared/images/lock.svg" /></button>
             </td>
         </tr>
     </table>
+    <div id="main-view">
+        <div class="@(_currentTab == Tab.Teams ? "tab-view-container" : "display-none")">
+            <TeamsView @ref="_teamsViewRef"></TeamsView>
+        </div>
+        <div class="@(_currentTab == Tab.Settings ? "tab-view-container" : "display-none")">
+            <SettingsView OnValidSubmitCallback="OnValidSubmitCallback"></SettingsView>
+        </div>
+        <div id="map-view-container" class="@(_currentTab == Tab.Map ? "" : "map-view-container-open-tab")">
+            <MapView @ref="_mapViewRef"></MapView>
+        </div>
+    </div>
 </div>
 
 @code {

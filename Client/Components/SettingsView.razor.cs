@@ -24,13 +24,13 @@ public partial class SettingsView : IDisposable
         public const int UsernameMaxChars = 28;
 
         [StringLength(UsernameMaxChars, ErrorMessage = "Username must be 28 characters or less.")]
-        public string Username { get; set; } = "";
+        public string? Username { get; set; }
 
         [RegularExpression("^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$", ErrorMessage = "Invalid Format")]
         public string Color { get; set; } = "#000000";
     }
 
-    protected override async void OnParametersSet()
+    protected override void OnParametersSet()
     {
         base.OnParametersSet();
         _formData.Username = AppState.GetUser().Username;
