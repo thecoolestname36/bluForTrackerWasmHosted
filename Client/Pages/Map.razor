@@ -16,33 +16,34 @@
         {
             <table class="tableScrollable">
                 <thead>
-                    <tr>
-                        <th>Username</th>
-                        <th>Status</th>
-                        <th>Staleness</th>
-                        <th>Remove Icon</th>
-                    </tr>
+                <tr>
+                    <th>Username</th>
+                    <th>Message</th>
+                    <th>State</th>
+                </tr>
                 </thead>
                 <tbody>
-                    @foreach(var item in _markers)
-                    {
-                        <tr style="cursor:pointer; box-shadow:0px -16px 32px inset @item.Value.Color">
-                            <td @onclick="async () => await SetCenter(item.Value)">@item.Value.Label</td>
+                @foreach (var item in _markers)
+                {
+                    <tr style="cursor:pointer; box-shadow:0px -16px 32px inset @item.Value.Color">
+                        <td @onclick="async () => await SetCenter(item.Value)">@item.Value.Label</td>
+                        <td @onclick="async () => await SetCenter(item.Value)">Show message and when clicked on it will focus map to message, not user</td>
+                        <td @onclick="async () => await SetCenter(item.Value)">
                             @{
                                 var status = item.Value.Connected ? "Connected" : "Disconnected";
-                                var age = "";
                                 var diff = DateTimeOffset.UtcNow - item.Value.UpdatedOn;
-                                if(diff.TotalSeconds >= 15)
+                                if (diff.TotalSeconds < 15)
                                 {
-                                    status = "Stale";
-                                    age = new DateTime(diff.Ticks).ToString("m:ss");
+                                    @status
+                                }
+                                else
+                                {
+                                    <button type="button" class="btn btn-danger btn-sm btn-block" @onclick="async () => await RemoveMarker(item.Value.Id)">Stale (@(new DateTime(diff.Ticks).ToString("m:ss")))</button>
                                 }
                             }
-                            <td @onclick="async () => await SetCenter(item.Value)">@status</td>
-                            <td @onclick="async () => await SetCenter(item.Value)">@age</td>
-                            <td><button type="button" class="btn btn-danger btn-sm btn-block" @onclick="async () => await RemoveMarker(item.Value.Id)">REMOVE</button></td>
-                        </tr>
-                    }
+                        </td>
+                    </tr>
+                }
                 </tbody>
             </table>
         } else
@@ -62,6 +63,9 @@
                     break;
             }
         }
+    </div>
+    <div id="map-menu">
+        <button type="button" class="btn btn-danger btn-lg" @onclick="Exit">Exit</button>
     </div>
 </div>
 
@@ -94,6 +98,7 @@
     Form.MarkerFormModel? _formData = null;
     HubConnection? _hubConnection;
     ConcurrentDictionary<string, Marker> _markers = new();
+    CancellationTokenSource _jobTokenSource = new();
 
     protected override void OnParametersSet()
     {
@@ -128,8 +133,10 @@
     PeriodicTimer? _mapLoadTimer;
     async Task MapLoadLoop()
     {
+        if (_jobTokenSource.IsCancellationRequested) return;
+        
         _mapLoadTimer ??= new(TimeSpan.FromMilliseconds(125));
-        while(await _mapLoadTimer.WaitForNextTickAsync())
+        while(await _mapLoadTimer.WaitForNextTickAsync(_jobTokenSource.Token))
         {
             if(await _mapModuleJs.InvokeAsync<bool>("isGoogleMapsApiLoading")) continue;
             await _mapModuleJs.InvokeVoidAsync("addListenerOnceMapIdle", DotNetObjectReference.Create(this));
@@ -142,8 +149,10 @@
     PeriodicTimer? _viewRenderTimer;
     async void ViewRenderLoop()
     {
+        if (_jobTokenSource.IsCancellationRequested) return;
+        
         _viewRenderTimer ??= new(TimeSpan.FromSeconds(1));
-        while(await _viewRenderTimer.WaitForNextTickAsync())
+        while(await _viewRenderTimer.WaitForNextTickAsync(_jobTokenSource.Token))
         {
             StateHasChanged();
         }
@@ -152,9 +161,11 @@
     PeriodicTimer? _sendLocationTimer;
     async void SendLocationLoop()
     {
+        if (_jobTokenSource.IsCancellationRequested) return;
+        
         _sendLocationTimer ??= new(TimeSpan.FromMilliseconds(125));
         var sending = false;
-        while(await _sendLocationTimer.WaitForNextTickAsync())
+        while(await _sendLocationTimer.WaitForNextTickAsync(_jobTokenSource.Token))
         {
             if(sending) continue;
 
@@ -181,9 +192,11 @@
     PeriodicTimer? _sendMyInfoMarkerTimer;
     async void SendMyInfoMarkerLoop()
     {
+        if (_jobTokenSource.IsCancellationRequested) return;
+        
         _sendMyInfoMarkerTimer ??= new(TimeSpan.FromSeconds(1));
         var sending = false;
-        while(await _sendMyInfoMarkerTimer.WaitForNextTickAsync())
+        while(await _sendMyInfoMarkerTimer.WaitForNextTickAsync(_jobTokenSource.Token))
         {
             if(sending) continue;
 
@@ -244,6 +257,17 @@
         if(hubConnection.State == HubConnectionState.Connected)
         {
             await hubConnection.SendAsync(Routing.MarkerHub.Server.RemoveMarker, key);
+        }
+    }
+
+    async Task Exit()
+    {
+        var hubConnection = await GetHubConnection();
+        if(hubConnection.State == HubConnectionState.Connected)
+        {
+            await _jobTokenSource.CancelAsync();
+            await hubConnection.SendAsync(Routing.MarkerHub.Server.Exit);
+            NavManager.NavigateTo($"/{Version}/", true);
         }
     }
 

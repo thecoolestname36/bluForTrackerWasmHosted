@@ -12,25 +12,31 @@ public class MarkerHub : Hub
     public override async Task OnConnectedAsync()
     {
         await base.OnConnectedAsync();
-        foreach(var item in InfoMarkers)
-        {
-            if(item.Value == null || (DateTimeOffset.UtcNow - item.Value.CreatedOn).TotalSeconds > 3600)
-            {
-                InfoMarkers.Remove(item.Key, out _);
-                await Clients.All.SendAsync(Routing.MarkerHub.Client.RemoveInfoMarker, item.Key);
-            }
-        }
-        foreach(var item in Markers)
-        {
-            if(item.Value == null || (DateTimeOffset.UtcNow - item.Value.UpdatedOn).TotalSeconds > 3600)
-            {
-                Markers.Remove(item.Key, out _);
-                await Clients.All.SendAsync(Routing.MarkerHub.Client.RemoveMarker, item.Key);
-            }
-        }
         await Clients.Caller.SendAsync(Routing.MarkerHub.Client.ReceiveConnectionId, Context.ConnectionId);
         await Clients.Caller.SendAsync(Routing.MarkerHub.Client.SyncMarkers, Markers.Values.ToList());
         await Clients.Caller.SendAsync(Routing.MarkerHub.Client.SyncInfoMarkers, InfoMarkers.Values.ToList());
+
+        return;
+        
+        async Task RemoveOldClients()
+        {
+            foreach(var item in InfoMarkers)
+            {
+                if(item.Value == null || (DateTimeOffset.UtcNow - item.Value.CreatedOn).TotalSeconds > 3600)
+                {
+                    InfoMarkers.Remove(item.Key, out _);
+                    await Clients.All.SendAsync(Routing.MarkerHub.Client.RemoveInfoMarker, item.Key);
+                }
+            }
+            foreach(var item in Markers)
+            {
+                if(item.Value == null || (DateTimeOffset.UtcNow - item.Value.UpdatedOn).TotalSeconds > 3600)
+                {
+                    Markers.Remove(item.Key, out _);
+                    await Clients.All.SendAsync(Routing.MarkerHub.Client.RemoveMarker, item.Key);
+                }
+            }
+        }
     }
 
     public override async Task OnDisconnectedAsync(Exception? exception)
@@ -56,6 +62,16 @@ public class MarkerHub : Hub
         Markers.TryRemove(key, out _);
         await Clients.All.SendAsync(Routing.MarkerHub.Client.RemoveMarker, key);
         await Clients.All.SendAsync(Routing.MarkerHub.Client.RemoveInfoMarker, key);
+    }
+
+    [HubMethodName(Routing.MarkerHub.Server.Exit)]
+    public async Task Exit()
+    {
+        if(Markers.TryRemove(Context.ConnectionId, out var key)) 
+        {
+            await Clients.All.SendAsync(Routing.MarkerHub.Client.RemoveMarker, key);
+            await Clients.All.SendAsync(Routing.MarkerHub.Client.RemoveInfoMarker, key);
+        }
     }
 
     [HubMethodName(Routing.MarkerHub.Server.BroadcastInfoMarker)]

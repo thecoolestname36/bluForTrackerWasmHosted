@@ -22,17 +22,6 @@
         </div>
 
         <div class="form-group">
-            <label for="team">Team:</label>
-            <InputSelect @bind-Value="_formData.Team" id="team" class="form-control" required>
-                <option value=""></option>
-                @foreach(var item in Enum.GetValues(typeof(Team)))
-                {
-                    <option value="@item">@item.ToString()</option>
-                }
-            </InputSelect>
-        </div>
-
-        <div class="form-group">
             <label for="color">Marker Color:</label>
             <input type="color" @bind="_formData.Color" id="color" required />
         </div>
@@ -53,14 +42,16 @@
     [Parameter]
     public string? FormData { get; set; }
 
-    private MarkerFormModel _formData = new();
+    private MarkerFormModel _formData = new()
+    {
+        Team = Team.None
+    };
 
     public class MarkerFormModel
     {
         public const int LabelMaxChars = 28;
 
-        [Required]
-        public Team? Team { get; set; }
+        [Required] public Team? Team { get; set; }
 
         [StringLength(LabelMaxChars, ErrorMessage = "Label must be 28 characters or less.")]
         public string Label { get; set; } = "";
