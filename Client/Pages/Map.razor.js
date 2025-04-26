@@ -122,6 +122,8 @@ export class MapModule {
         }
         this.infoMarkers[infoMarker.id].setPosition({ lat: infoMarker.latitude, lng: infoMarker.longitude });
 
+        // TODO - Move this to Blazor
+        
         // Step 1: Parse the ISO 8601 string
         const dateObject = new Date(infoMarker.createdOn);
 
@@ -135,8 +137,10 @@ export class MapModule {
 
         // Step 4: Create the date time format
         const dateTimeFormat = `${formattedHours}:${minutes.toString().padStart(2, "0")} ${amOrPm}`;
+        
+        let messageContent = "<h6 style='color:" + infoMarker.labelColor + "'>" + infoMarker.label + "</h6><div>" + infoMarker.message + "</div><div>" + dateTimeFormat + "</div>";
 
-        this.infoMarkers[infoMarker.id].setContent("<h6 style='color:" + infoMarker.labelColor + "'>" + infoMarker.label + "</h6>" + infoMarker.message + dateTimeFormat);
+        this.infoMarkers[infoMarker.id].setContent(messageContent);
         this.infoMarkers[infoMarker.id].open(window.mapModule.map);
     }
     removeInfoMarker(key) {

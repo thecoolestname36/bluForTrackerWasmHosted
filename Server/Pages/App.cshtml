@@ -45,7 +45,9 @@
 </head>
 
 <body>
-    <div id="app">Loading...</div>
+<div id="app">
+    <div class="lds-ripple-container"><div class="lds-ripple"><div></div><div></div></div></div>
+</div>
 
     <div id="blazor-error-ui">
         An unhandled error has occurred.
@@ -65,7 +67,6 @@
             }
         };
     </script>
-    <script async src="https://maps.googleapis.com/maps/api/js?key=@googleMapsApiKey&libraries=places&callback=window.mapModule.mapsCallback"></script>
     <component type="typeof(HeadOutlet)" render-mode="WebAssembly" />
     <script>navigator.serviceWorker.register('service-worker.js?v=@appVersion', { updateViaCache: 'none' });</script>
 </body>

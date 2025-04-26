@@ -6,8 +6,11 @@
 @using Microsoft.AspNetCore.SignalR.Client
 @using Blazored.LocalStorage
 @using BluForTracker.Shared
+@inject IConfiguration Configuration
 @implements IAsyncDisposable
-
+@{
+    var googleMapsApiKey = Configuration.GetValue<string>("GoogleMapsApiKey");
+}
 <PageTitle>Map</PageTitle>
 <div id="map-container">
     <div id="map"></div>
@@ -17,18 +20,16 @@
             <table class="tableScrollable">
                 <thead>
                 <tr>
-                    <th>Username</th>
+                    <th style="width:100px">State</th>
+                    <th style="width:160px">Username</th>
                     <th>Message</th>
-                    <th>State</th>
                 </tr>
                 </thead>
                 <tbody>
                 @foreach (var item in _markers)
                 {
                     <tr style="cursor:pointer; box-shadow:0px -16px 32px inset @item.Value.Color">
-                        <td @onclick="async () => await SetCenter(item.Value)">@item.Value.Label</td>
-                        <td @onclick="async () => await SetCenter(item.Value)">Show message and when clicked on it will focus map to message, not user</td>
-                        <td @onclick="async () => await SetCenter(item.Value)">
+                        <td style="width:100px">
                             @{
                                 var status = item.Value.Connected ? "Connected" : "Disconnected";
                                 var diff = DateTimeOffset.UtcNow - item.Value.UpdatedOn;
@@ -42,6 +43,16 @@
                                 }
                             }
                         </td>
+                        <td style="width:160px" @onclick="async () => await SetCenter(item.Value)">@item.Value.Label</td>
+                        @if (_infoMarkers.TryGetValue(item.Key, out var infoMarker))
+                        {
+                            Console.WriteLine(infoMarker.Message);
+                            <td @onclick="async () => await SetCenter(infoMarker)">@infoMarker.Message</td>
+                        }
+                        else
+                        {
+                            <td @onclick="async () => await SetCenter(item.Value)"></td>
+                        }
                     </tr>
                 }
                 </tbody>
@@ -68,6 +79,7 @@
         <button type="button" class="btn btn-danger btn-lg" @onclick="Exit">Exit</button>
     </div>
 </div>
+<script async src="https://maps.googleapis.com/maps/api/js?key=@googleMapsApiKey&libraries=places&callback=window.mapModule.mapsCallback"></script>
 
 @code {
 
@@ -98,6 +110,7 @@
     Form.MarkerFormModel? _formData = null;
     HubConnection? _hubConnection;
     ConcurrentDictionary<string, Marker> _markers = new();
+    ConcurrentDictionary<string, InfoMarker> _infoMarkers = new();
     CancellationTokenSource _jobTokenSource = new();
 
     protected override void OnParametersSet()
@@ -236,7 +249,7 @@
             Team = _formData?.Team ?? Team.None,
             Label = _formData?.Label ?? "unk",
             LabelColor = _formData?.Color ?? "#000000",
-            Message = string.IsNullOrEmpty(message) ? "" : message + "<br/>",
+            Message = string.IsNullOrEmpty(message) ? "" : message,
             Latitude = lat,
             Longitude = lng
         };
@@ -272,6 +285,8 @@
     }
 
     async Task SetCenter(Marker marker) => await _mapModuleJs.InvokeVoidAsync("setCenter", marker.Latitude, marker.Longitude);
+    
+    async Task SetCenter(InfoMarker marker) => await _mapModuleJs.InvokeVoidAsync("setCenter", marker.Latitude, marker.Longitude);
 
     public async Task<HubConnection> GetHubConnection()
     {
@@ -321,17 +336,22 @@
             });
             _hubConnection.On<List<InfoMarker>>(Routing.MarkerHub.Client.SyncInfoMarkers, async (infoMarkers) =>
             {
-                await _mapModuleJs.InvokeVoidAsync("syncInfoMarkers", infoMarkers.Where(infoMarker => infoMarker.Team == _formData?.Team).ToList());
+                var list = infoMarkers.Where(infoMarker => infoMarker.Team == _formData?.Team).ToList();
+                _infoMarkers.Clear();
+                list.ForEach(m => _infoMarkers.TryAdd(m.Id, m));
+                await _mapModuleJs.InvokeVoidAsync("syncInfoMarkers", list);
             });
             _hubConnection.On<InfoMarker>(Routing.MarkerHub.Client.ReceiveInfoMarker, async (infoMarker) =>
             {
                 if (infoMarker.Team == _formData?.Team)
                 {
+                    _infoMarkers.AddOrUpdate(infoMarker.Id, infoMarker, (key, value) => infoMarker);
                     await _mapModuleJs.InvokeVoidAsync("receiveInfoMarker", infoMarker);
                 }
             });
             _hubConnection.On<string>(Routing.MarkerHub.Client.RemoveInfoMarker, async (key) =>
             {
+                _infoMarkers.TryRemove(key, out _);
                 await _mapModuleJs.InvokeVoidAsync("removeInfoMarker", key);
             });
         }
