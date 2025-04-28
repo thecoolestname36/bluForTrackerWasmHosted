@@ -8,20 +8,13 @@
 @{
     Layout = null;
     var appVersion = typeof(App).Assembly.GetName().Version?.ToString() ?? "unk";
-
-    if (Request.RouteValues.TryGetValue("clientVersion", out var clientVersion) && clientVersion is string && ((string)clientVersion).StartsWith(appVersion))
+    Request.RouteValues.TryGetValue("clientVersion", out var clientVersion);
+    
+    if (string.IsNullOrEmpty(clientVersion as string ?? "")
+        || !appVersion.StartsWith(clientVersion as string ?? ""))
     {
-        // Client version is up to date, no work needs to be done
-    }
-    else if (Request.RouteValues.TryGetValue("path", out var path) && path is string && ((string)path).StartsWith(appVersion))
-    {
-        // Client has an existing path and version is up to date, no work needs to be done
-    }
-    else
-    {
-        // Client needs a verison update!
         Response.Headers.TryAdd("Clear-Site-Data", "cache");
-        Response.Redirect($"/{appVersion}/");
+        Response.Redirect($"/{appVersion}");
         return;
     }
 
@@ -49,15 +42,15 @@
     <div class="lds-ripple-container"><div class="lds-ripple"><div></div><div></div></div></div>
 </div>
 
-    <div id="blazor-error-ui">
-        An unhandled error has occurred.
-        <a href="" class="reload">Reload</a>
-        <a class="dismiss">🗙</a>
-    </div>
+<div id="blazor-error-ui">
+    An unhandled error has occurred.
+    <a href="" class="reload">Reload</a>
+    <a class="dismiss">🗙</a>
+</div>
 
-    <script src="_framework/blazor.webassembly.js?v=@appVersion"></script>
+<script src="_framework/blazor.webassembly.js?v=@appVersion"></script>
 
-    <script>
+<script>
         window.mapModule = {
             map: null,
             positionWatch: null,
@@ -67,8 +60,8 @@
             }
         };
     </script>
-    <component type="typeof(HeadOutlet)" render-mode="WebAssembly" />
-    <script>navigator.serviceWorker.register('service-worker.js?v=@appVersion', { updateViaCache: 'none' });</script>
+<component type="typeof(HeadOutlet)" render-mode="WebAssembly" />
+<script>navigator.serviceWorker.register('service-worker.js?v=@appVersion', { updateViaCache: 'none' });</script>
 </body>
 
 </html>

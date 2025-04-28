@@ -68,13 +68,13 @@
         if (await LocalStorage.ContainKeyAsync(nameof(UserStore)))
         {
             // If user exists in storage, continue to the map page
-            NavManager.NavigateTo($"/{Version}/map");
+            NavManager.NavigateTo($"/map/{Version}");
         }
     }
 
     private async Task OnSubmit()
     {
         await LocalStorage.SetItemAsync(nameof(UserStore), _formData.ToUserStore());
-        NavManager.NavigateTo($"/{Version}/map");
+        NavManager.NavigateTo($"/map/{Version}");
     }
 }

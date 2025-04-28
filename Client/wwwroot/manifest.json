@@ -1,7 +1,7 @@
 {
   "name": "BluForTracker",
   "short_name": "BluForTracker",
-  "start_url": "./?v=1.21",
+  "start_url": "./1.22",
   "display": "browser",
   "background_color": "#ffffff",
   "theme_color": "#03173d",

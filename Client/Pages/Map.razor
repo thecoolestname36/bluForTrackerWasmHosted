@@ -1,4 +1,4 @@
-﻿@page "/{version}/map"
+﻿@page "/map/{version}"
 @using System.Collections.Concurrent
 @using Microsoft.AspNetCore.SignalR.Client
 @using Blazored.LocalStorage
@@ -119,8 +119,9 @@
         
         if(firstRender)
         {
-            if (!await LocalStorage.ContainKeyAsync(nameof(UserStore)) ||
-                (_currentUser = (await LocalStorage.GetItemAsync<UserStore>(nameof(UserStore)))?.ToCurrentUserModel()) == null)
+            if (string.IsNullOrEmpty(Version)
+                || !await LocalStorage.ContainKeyAsync(nameof(UserStore))
+                || (_currentUser = (await LocalStorage.GetItemAsync<UserStore>(nameof(UserStore)))?.ToCurrentUserModel()) == null)
             {
                 // No user set, redirect to user page
                 NavManager.NavigateTo($"/", true);
@@ -141,45 +142,53 @@
     async Task MapLoadLoop()
     {
         if (_jobTokenSource.IsCancellationRequested) return;
-        
         _mapLoadTimer ??= new(TimeSpan.FromMilliseconds(125));
-        while(await _mapLoadTimer.WaitForNextTickAsync(_jobTokenSource.Token))
+        try
         {
-            if(await _mapModuleJs.InvokeAsync<bool>("isGoogleMapsApiLoading")) continue;
-            await _mapModuleJs.InvokeVoidAsync("addListenerOnceMapIdle", DotNetObjectReference.Create(this));
-            _mapLoadTimer.Dispose();
-            _mapLoadTimer = null;
-            return;
-        }
+            while(await _mapLoadTimer.WaitForNextTickAsync(_jobTokenSource.Token))
+            {
+                if(_mapModuleJs == null || await _mapModuleJs.InvokeAsync<bool>("isGoogleMapsApiLoading")) continue;
+                await _mapModuleJs.InvokeVoidAsync("addListenerOnceMapIdle", DotNetObjectReference.Create(this));
+                _mapLoadTimer.Dispose();
+                _mapLoadTimer = null;
+                return;
+            }   
+        } catch {}
     }
 
     PeriodicTimer? _viewRenderTimer;
-    async void ViewRenderLoop()
+    async Task ViewRenderLoop()
     {
         if (_jobTokenSource.IsCancellationRequested) return;
-        
         _viewRenderTimer ??= new(TimeSpan.FromSeconds(1));
-        while(await _viewRenderTimer.WaitForNextTickAsync(_jobTokenSource.Token))
+        try
         {
-            StateHasChanged();
+            while(await _viewRenderTimer.WaitForNextTickAsync(_jobTokenSource.Token))
+            {
+                StateHasChanged();
+            }
         }
+        catch {}
     }
 
     PeriodicTimer? _sendLocationTimer;
-    async void SendLocationLoop()
+    async Task SendLocationLoop()
     {
         if (_jobTokenSource.IsCancellationRequested) return;
         
         _sendLocationTimer ??= new(TimeSpan.FromMilliseconds(125));
         var sending = false;
-        while(await _sendLocationTimer.WaitForNextTickAsync(_jobTokenSource.Token))
-        {
-            if(sending) continue;
 
-            var hubConnection = await GetHubConnection();
-            if(hubConnection.State == HubConnectionState.Connected && _currentLocation.HasValue)
+        try
+        {
+            while(await _sendLocationTimer.WaitForNextTickAsync(_jobTokenSource.Token))
             {
-                var marker = new Marker
+                if(sending) continue;
+
+                var hubConnection = await GetHubConnection();
+                if(hubConnection.State == HubConnectionState.Connected && _currentLocation.HasValue)
+                {
+                    var marker = new Marker
                     {
                         Latitude = _currentLocation.Value.Latitude,
                         Longitude = _currentLocation.Value.Longitude,
@@ -188,29 +197,31 @@
                         Color = _currentUser?.Color ?? "#000000",
                         Connected = true
                     };
-                _currentLocation = null;
-                sending = true;
-                await hubConnection.SendAsync(Routing.MarkerHub.Server.BroadcastMarker, marker);
-                sending = false;
+                    _currentLocation = null;
+                    sending = true;
+                    await hubConnection.SendAsync(Routing.MarkerHub.Server.BroadcastMarker, marker);
+                    sending = false;
+                }
             }
-        }
+        } catch {}
     }
 
     PeriodicTimer? _sendMyInfoMarkerTimer;
-    async void SendMyInfoMarkerLoop()
+    async Task SendMyInfoMarkerLoop()
     {
         if (_jobTokenSource.IsCancellationRequested) return;
-        
         _sendMyInfoMarkerTimer ??= new(TimeSpan.FromSeconds(1));
         var sending = false;
-        while(await _sendMyInfoMarkerTimer.WaitForNextTickAsync(_jobTokenSource.Token))
+        try
         {
-            if(sending) continue;
-
-            var hubConnection = await GetHubConnection();
-            if(hubConnection.State == HubConnectionState.Connected && _myInfoMarker != null)
+            while(await _sendMyInfoMarkerTimer.WaitForNextTickAsync(_jobTokenSource.Token))
             {
-                var infoMarker = new InfoMarker
+                if(sending) continue;
+
+                var hubConnection = await GetHubConnection();
+                if(hubConnection.State == HubConnectionState.Connected && _myInfoMarker != null)
+                {
+                    var infoMarker = new InfoMarker
                     {
                         Team = _currentUser?.Team ?? Team.None,
                         Label = _myInfoMarker.Label,
@@ -219,12 +230,13 @@
                         Latitude = _myInfoMarker.Latitude,
                         Longitude = _myInfoMarker.Longitude
                     };
-                _myInfoMarker = null;
-                sending = true;
-                await hubConnection.SendAsync(Routing.MarkerHub.Server.BroadcastInfoMarker, infoMarker);
-                sending = false;
+                    _myInfoMarker = null;
+                    sending = true;
+                    await hubConnection.SendAsync(Routing.MarkerHub.Server.BroadcastInfoMarker, infoMarker);
+                    sending = false;
+                }
             }
-        }
+        } catch {}
     }
 
     [JSInvokable]
@@ -272,9 +284,9 @@
         var hubConnection = await GetHubConnection();
         if(hubConnection.State == HubConnectionState.Connected)
         {
-            await LocalStorage.ClearAsync();
+            await _jobTokenSource.CancelAsync();
             await hubConnection.SendAsync(Routing.MarkerHub.Server.Exit);
-            //await DisposeAsync();
+            await LocalStorage.ClearAsync();
             NavManager.NavigateTo($"/", true);
         }
     }
