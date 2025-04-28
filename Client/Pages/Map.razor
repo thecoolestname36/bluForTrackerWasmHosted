@@ -8,78 +8,83 @@
 @using BluForTracker.Shared
 @inject IConfiguration Configuration
 @implements IAsyncDisposable
-@{
-    var googleMapsApiKey = Configuration.GetValue<string>("GoogleMapsApiKey");
-}
 <PageTitle>Map</PageTitle>
-<div id="map-container">
-    <div id="map"></div>
-    <div id="map-player-box">
-        @if(_hubConnection?.State == HubConnectionState.Connected)
-        {
-            <table class="tableScrollable">
-                <thead>
-                <tr>
-                    <th style="width:100px">State</th>
-                    <th style="width:160px">Username</th>
-                    <th>Message</th>
-                </tr>
-                </thead>
-                <tbody>
-                @foreach (var item in _markers)
-                {
-                    <tr style="cursor:pointer; box-shadow:0px -16px 32px inset @item.Value.Color">
-                        <td style="width:100px">
-                            @{
-                                var status = item.Value.Connected ? "Connected" : "Disconnected";
-                                var diff = DateTimeOffset.UtcNow - item.Value.UpdatedOn;
-                                if (diff.TotalSeconds < 15)
-                                {
-                                    @status
-                                }
-                                else
-                                {
-                                    <button type="button" class="btn btn-danger btn-sm btn-block" @onclick="async () => await RemoveMarker(item.Value.Id)">Stale (@(new DateTime(diff.Ticks).ToString("m:ss")))</button>
-                                }
-                            }
-                        </td>
-                        <td style="width:160px" @onclick="async () => await SetCenter(item.Value)">@item.Value.Label</td>
-                        @if (_infoMarkers.TryGetValue(item.Key, out var infoMarker))
-                        {
-                            Console.WriteLine(infoMarker.Message);
-                            <td @onclick="async () => await SetCenter(infoMarker)">@infoMarker.Message</td>
-                        }
-                        else
-                        {
-                            <td @onclick="async () => await SetCenter(item.Value)"></td>
-                        }
-                    </tr>
-                }
-                </tbody>
-            </table>
-        } else
-        {
-            switch(_hubConnection?.State)
-            {
-                case HubConnectionState.Connecting:
-                case HubConnectionState.Reconnecting:
-                    <div class="alert alert-warning" role="alert">@_hubConnection?.State.ToString()</div>
-                    break;
-                case HubConnectionState.Disconnected:
-                    <div class="alert alert-danger" role="alert">@_hubConnection?.State.ToString()</div>
-                    break;
-                case null:
-                default:
-                    <div class="alert alert-secondary" role="alert">No hub connection</div>
-                    break;
-            }
-        }
-    </div>
-    <div id="map-menu">
+
+<div id="map-page-container">
+    <div id="map-menu-container">
         <button type="button" class="btn btn-danger btn-lg" @onclick="Exit">Exit</button>
     </div>
+    <div id="map-container">
+        <div id="map"></div>
+        <div id="map-player-box">
+            @if(_hubConnection?.State == HubConnectionState.Connected)
+            {
+                <table class="tableScrollable">
+                    <thead>
+                    <tr>
+                        <th style="width:100px">State</th>
+                        <th style="width:160px" >
+                            <button class="btn btn-block btn-outline-dark" @onclick="() => SetFrameOnClick(latitude: 40.12, longitude: -100.45, zoom: 4.0)">Username</button>
+                        </th>
+                        <th>Message</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var item in _markers)
+                    {
+                        <tr style="cursor:pointer; box-shadow:0px -16px 32px inset @item.Value.Color">
+                            <td style="width:100px">
+                                @{
+                                    var status = item.Value.Connected ? "Connected" : "Disconnected";
+                                    var diff = DateTimeOffset.UtcNow - item.Value.UpdatedOn;
+                                    if (diff.TotalSeconds < 15)
+                                    {
+                                        @status
+                                    }
+                                    else
+                                    {
+                                        <button type="button" class="btn btn-danger btn-sm btn-block" @onclick="async () => await RemoveMarker(item.Value.Id)">Stale (@(new DateTime(diff.Ticks).ToString("m:ss")))</button>
+                                    }
+                                }
+                            </td>
+                            <td style="width:160px">
+                                <button class="btn btn-block btn-outline-dark" @onclick="() => SetFrameOnClick(item.Value)">@item.Value.Label</button>
+                            </td>
+                            @if (_infoMarkers.TryGetValue(item.Key, out var infoMarker))
+                            {
+                                <td>
+                                    <button class="btn btn-block btn-outline-dark" @onclick="() => SetFrameOnClick(infoMarker)">@infoMarker.Message</button>
+                                </td>
+                            }
+                            else
+                            {
+                                <td @onclick="() => SetFrameOnClick(item.Value)"></td>
+                            }
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            } else
+            {
+                switch(_hubConnection?.State)
+                {
+                    case HubConnectionState.Connecting:
+                    case HubConnectionState.Reconnecting:
+                        <div class="alert alert-warning" role="alert">@_hubConnection?.State.ToString()</div>
+                        break;
+                    case HubConnectionState.Disconnected:
+                        <div class="alert alert-danger" role="alert">@_hubConnection?.State.ToString()</div>
+                        break;
+                    case null:
+                    default:
+                        <div class="alert alert-secondary" role="alert">No hub connection</div>
+                        break;
+                }
+            }
+        </div>
+    </div>
 </div>
-<script async src="https://maps.googleapis.com/maps/api/js?key=@googleMapsApiKey&libraries=places&callback=window.mapModule.mapsCallback"></script>
+<script async src="https://maps.googleapis.com/maps/api/js?key=@(Configuration.GetValue<string>("GoogleMapsApiKey"))&callback=window.mapModule.mapsCallback&libraries=maps,marker"></script>
 
 @code {
 
@@ -134,6 +139,7 @@
         if(firstRender)
         {
             var collocatedJs = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./Pages/Map.razor.js");
+            // TODO - Convert this to a JS Interop with JSImport
             _mapModuleJs = await collocatedJs.InvokeAsync<IJSObjectReference>("CreateMapModule");
             await MapLoadLoop();
             await GetHubConnection();
@@ -278,15 +284,20 @@
         var hubConnection = await GetHubConnection();
         if(hubConnection.State == HubConnectionState.Connected)
         {
-            await _jobTokenSource.CancelAsync();
             await hubConnection.SendAsync(Routing.MarkerHub.Server.Exit);
+            //await DisposeAsync();
             NavManager.NavigateTo($"/{Version}/", true);
         }
     }
 
-    async Task SetCenter(Marker marker) => await _mapModuleJs.InvokeVoidAsync("setCenter", marker.Latitude, marker.Longitude);
+    Task SetFrameOnClick(Marker marker) => SetFrameOnClick(marker.Latitude, marker.Longitude);
     
-    async Task SetCenter(InfoMarker marker) => await _mapModuleJs.InvokeVoidAsync("setCenter", marker.Latitude, marker.Longitude);
+    Task SetFrameOnClick(InfoMarker marker) => SetFrameOnClick(marker.Latitude, marker.Longitude);
+
+    Task SetFrameOnClick(double latitude, double longitude, double zoom = 16.0) => Task.WhenAll([
+        _mapModuleJs?.InvokeVoidAsync("setCenter", latitude, longitude).AsTask() ?? Task.CompletedTask,
+        _mapModuleJs?.InvokeVoidAsync("setZoom", zoom).AsTask() ?? Task.CompletedTask,
+    ]);
 
     public async Task<HubConnection> GetHubConnection()
     {
@@ -334,6 +345,15 @@
                 StateHasChanged();
                 await _mapModuleJs.InvokeVoidAsync("removeMarker", key);
             });
+            _hubConnection.On<string>(Routing.MarkerHub.Server.Exit, (key) =>
+            {
+                _markers.TryRemove(key, out _);
+                _infoMarkers.TryRemove(key, out _);
+                StateHasChanged();
+                _mapModuleJs?.InvokeVoidAsync("removeMarker", key);
+                _mapModuleJs?.InvokeVoidAsync("removeInfoMarker", key);
+            });
+
             _hubConnection.On<List<InfoMarker>>(Routing.MarkerHub.Client.SyncInfoMarkers, async (infoMarkers) =>
             {
                 var list = infoMarkers.Where(infoMarker => infoMarker.Team == _formData?.Team).ToList();
@@ -366,6 +386,12 @@
 
     public async ValueTask DisposeAsync()
     {
+        try
+        {
+            await _jobTokenSource.CancelAsync();
+        }
+        catch { }
+        
         _markers.Clear();
         _currentLocation = null;
         _formData = null;

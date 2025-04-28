@@ -15,11 +15,11 @@ export class MapModule {
         }
     }
     addListenerOnceMapIdle(ref) {
-        //console.info("addListenerOnceMapIdle", ref);
+        //console.info("addListenerOnceMapIdle", ref);setCenter
         this.dotNetReference = ref;
         window.mapModule.map = new google.maps.Map(document.getElementById("map"), {
-            zoom: 5,
-            center: { lat: 36.0, lng: -98.0 },
+            zoom: 4,
+            center: { lat: 40.12, lng: -100.45 },
             mapTypeId: 'terrain'
         });
         for(let i = 0; i < this.markers.length; i++) {
@@ -148,9 +148,11 @@ export class MapModule {
         this.infoMarkers[key].setMap(null);
         delete this.infoMarkers[key];
     }
-    setCenter(lat, lng) {
+    setCenter(lat, lng, zoom) {
         window.mapModule.map.setCenter({ lat: lat, lng: lng });
-        window.mapModule.map.setZoom(16.0);
+    }
+    setZoom(zoom) {
+        window.mapModule.map.setZoom(zoom);
     }
 }
 

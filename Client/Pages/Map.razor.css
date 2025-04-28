@@ -1,0 +1,30 @@
+#map-page-container {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+#map-menu-container {
+    background-color: #f8f9fa;
+    border: 3px solid #e9ecef;
+}
+
+#map-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+#map {
+    position: relative;
+    overflow: hidden;
+    flex: 1;
+}
+
+#map-player-box {
+    height: 30vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background-color: #f8f9fa;
+    border: 3px solid #e9ecef;
+}

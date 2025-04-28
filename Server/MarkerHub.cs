@@ -67,11 +67,9 @@ public class MarkerHub : Hub
     [HubMethodName(Routing.MarkerHub.Server.Exit)]
     public async Task Exit()
     {
-        if(Markers.TryRemove(Context.ConnectionId, out var key)) 
-        {
-            await Clients.All.SendAsync(Routing.MarkerHub.Client.RemoveMarker, key);
-            await Clients.All.SendAsync(Routing.MarkerHub.Client.RemoveInfoMarker, key);
-        }
+        InfoMarkers.TryRemove(Context.ConnectionId, out _);
+        Markers.TryRemove(Context.ConnectionId, out _);
+        await Clients.All.SendAsync(Routing.MarkerHub.Server.Exit, Context.ConnectionId);
     }
 
     [HubMethodName(Routing.MarkerHub.Server.BroadcastInfoMarker)]
