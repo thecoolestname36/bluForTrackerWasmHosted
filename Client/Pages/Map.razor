@@ -1,10 +1,8 @@
-﻿@page "/{version}/map/{formData}"
-@using System.Drawing
-@using System.Text
-@using System.Text.Json
+﻿@page "/{version}/map"
 @using System.Collections.Concurrent
 @using Microsoft.AspNetCore.SignalR.Client
 @using Blazored.LocalStorage
+@using BluForTracker.Client.DataModels
 @using BluForTracker.Shared
 @inject IConfiguration Configuration
 @implements IAsyncDisposable
@@ -12,7 +10,7 @@
 
 <div id="map-page-container">
     <div id="map-menu-container">
-        <button type="button" class="btn btn-danger btn-lg" @onclick="Exit">Exit</button>
+        <button type="button" class="btn btn-danger btn-lg" style="float:right" @onclick="Exit">Exit</button>
     </div>
     <div id="map-container">
         <div id="map"></div>
@@ -100,9 +98,6 @@
     [Parameter]
     public required string Version { get; set; }
 
-    [Parameter]
-    public required string FormData { get; set; }
-
     struct GeolocationCoordinates
     {
         public required double Latitude { get; init; }
@@ -112,32 +107,25 @@
     IJSObjectReference? _mapModuleJs = default!;
     GeolocationCoordinates? _currentLocation;
     InfoMarker? _myInfoMarker;
-    Form.MarkerFormModel? _formData = null;
+    CurrentUserModel? _currentUser = null;
     HubConnection? _hubConnection;
     ConcurrentDictionary<string, Marker> _markers = new();
     ConcurrentDictionary<string, InfoMarker> _infoMarkers = new();
     CancellationTokenSource _jobTokenSource = new();
 
-    protected override void OnParametersSet()
-    {
-        base.OnParametersSet();
-        _formData = JsonSerializer.Deserialize<Form.MarkerFormModel>(Encoding.UTF8.GetString(Convert.FromBase64String(FormData))) ?? new Form.MarkerFormModel();
-        _formData.Label = _formData.Label[..Math.Min(Form.MarkerFormModel.LabelMaxChars, _formData.Label.Length)];
-        try
-        {
-            ColorTranslator.FromHtml(_formData.Color);
-        } catch
-        {
-            _formData.Color = "#000000";
-        }
-    }
-
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         await base.OnAfterRenderAsync(firstRender);
-
+        
         if(firstRender)
         {
+            if (!await LocalStorage.ContainKeyAsync(nameof(UserStore)) ||
+                (_currentUser = (await LocalStorage.GetItemAsync<UserStore>(nameof(UserStore)))?.ToCurrentUserModel()) == null)
+            {
+                // No user set, redirect to user page
+                NavManager.NavigateTo($"/", true);
+            }
+            
             var collocatedJs = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./Pages/Map.razor.js");
             // TODO - Convert this to a JS Interop with JSImport
             _mapModuleJs = await collocatedJs.InvokeAsync<IJSObjectReference>("CreateMapModule");
@@ -195,9 +183,9 @@
                     {
                         Latitude = _currentLocation.Value.Latitude,
                         Longitude = _currentLocation.Value.Longitude,
-                        Team = _formData?.Team ?? Team.None,
-                        Label = _formData?.Label ?? "",
-                        Color = _formData?.Color ?? "#000000",
+                        Team = _currentUser?.Team ?? Team.None,
+                        Label = _currentUser?.Label ?? "",
+                        Color = _currentUser?.Color ?? "#000000",
                         Connected = true
                     };
                 _currentLocation = null;
@@ -224,7 +212,7 @@
             {
                 var infoMarker = new InfoMarker
                     {
-                        Team = _formData?.Team ?? Team.None,
+                        Team = _currentUser?.Team ?? Team.None,
                         Label = _myInfoMarker.Label,
                         LabelColor = _myInfoMarker.LabelColor,
                         Message = _myInfoMarker.Message,
@@ -247,14 +235,14 @@
         };
 
     [JSInvokable]
-    public void UpdateCurrentPositionError() => NavManager.NavigateTo($"/{Version}/", true);
+    public void UpdateCurrentPositionError() => NavManager.NavigateTo($"/", true);
 
     [JSInvokable]
     public void UpdateMyInfoMarker(string message, double lat, double lng) => _myInfoMarker = new InfoMarker()
         {
-            Team = _formData?.Team ?? Team.None,
-            Label = _formData?.Label ?? "unk",
-            LabelColor = _formData?.Color ?? "#000000",
+            Team = _currentUser?.Team ?? Team.None,
+            Label = _currentUser?.Label ?? "unk",
+            LabelColor = _currentUser?.Color ?? "#000000",
             Message = string.IsNullOrEmpty(message) ? "" : message,
             Latitude = lat,
             Longitude = lng
@@ -284,9 +272,10 @@
         var hubConnection = await GetHubConnection();
         if(hubConnection.State == HubConnectionState.Connected)
         {
+            await LocalStorage.ClearAsync();
             await hubConnection.SendAsync(Routing.MarkerHub.Server.Exit);
             //await DisposeAsync();
-            NavManager.NavigateTo($"/{Version}/", true);
+            NavManager.NavigateTo($"/", true);
         }
     }
 
@@ -318,7 +307,7 @@
                     var hubConnection = await GetHubConnection();
                     if (hubConnection.State == HubConnectionState.Connected)
                     {
-                        await hubConnection.SendAsync(Routing.MarkerHub.Server.UpdateConnectionId, oldConnectionId, _formData?.Team ?? Team.None, _formData?.Color ?? "#000000");
+                        await hubConnection.SendAsync(Routing.MarkerHub.Server.UpdateConnectionId, oldConnectionId, _currentUser?.Team ?? Team.None, _currentUser?.Color ?? "#000000");
                     }
                 }
                 await LocalStorage.SetItemAsStringAsync("connection_id", connectionId);
@@ -326,13 +315,13 @@
             _hubConnection.On<List<Marker>>(Routing.MarkerHub.Client.SyncMarkers, async (markers) =>
             {
                 _markers = new ConcurrentDictionary<string, Marker>(
-                    markers.Where(marker => marker.Team == _formData?.Team).Select(marker => new KeyValuePair<string, Marker>(marker.Id, marker)));
+                    markers.Where(marker => marker.Team == _currentUser?.Team).Select(marker => new KeyValuePair<string, Marker>(marker.Id, marker)));
                 StateHasChanged();
                 await _mapModuleJs.InvokeVoidAsync("syncMarkers", _markers.Values.ToList());
             });
             _hubConnection.On<Marker>(Routing.MarkerHub.Client.ReceiveMarker, async (marker) =>
             {
-                if (marker.Team == _formData?.Team)
+                if (marker.Team == _currentUser?.Team)
                 {
                     _markers[marker.Id] = marker;
                     StateHasChanged();
@@ -356,14 +345,14 @@
 
             _hubConnection.On<List<InfoMarker>>(Routing.MarkerHub.Client.SyncInfoMarkers, async (infoMarkers) =>
             {
-                var list = infoMarkers.Where(infoMarker => infoMarker.Team == _formData?.Team).ToList();
+                var list = infoMarkers.Where(infoMarker => infoMarker.Team == _currentUser?.Team).ToList();
                 _infoMarkers.Clear();
                 list.ForEach(m => _infoMarkers.TryAdd(m.Id, m));
                 await _mapModuleJs.InvokeVoidAsync("syncInfoMarkers", list);
             });
             _hubConnection.On<InfoMarker>(Routing.MarkerHub.Client.ReceiveInfoMarker, async (infoMarker) =>
             {
-                if (infoMarker.Team == _formData?.Team)
+                if (infoMarker.Team == _currentUser?.Team)
                 {
                     _infoMarkers.AddOrUpdate(infoMarker.Id, infoMarker, (key, value) => infoMarker);
                     await _mapModuleJs.InvokeVoidAsync("receiveInfoMarker", infoMarker);
@@ -394,7 +383,7 @@
         
         _markers.Clear();
         _currentLocation = null;
-        _formData = null;
+        _currentUser = null;
         if(_hubConnection != null)
         {
             await _hubConnection.StopAsync();

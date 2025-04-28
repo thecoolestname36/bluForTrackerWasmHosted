@@ -1,22 +1,20 @@
 ﻿@page "/{version}"
-@using System.Text
-@using System.Text.Json
-@using System.ComponentModel.DataAnnotations
 @using Microsoft.AspNetCore.Components.Forms
+@using Blazored.LocalStorage
 @using BluForTracker.Shared
-@inject NavigationManager NavManager
+@using BluForTracker.Client.DataModels
 
 <PageTitle>User Form</PageTitle>
 
 <div class="container">
     <h2>User Form</h2>
 
-    <EditForm Model="@_formData" OnValidSubmit="OnSubmit">
+    <EditForm Model="@_formData" OnValidSubmit="async () => await OnSubmit()">
         <DataAnnotationsValidator />
         <ValidationSummary />
 
         <div class="form-group">
-            <label for="label">Username (Max @MarkerFormModel.LabelMaxChars characters):</label>
+            <label for="label">Username (Max @UserFormModel.LabelMaxChars characters):</label>
             <InputText @bind-Value="_formData.Label" class="form-control required" id="label" required />
             <ValidationMessage For="@(() => _formData.Label)" />
         </div>
@@ -28,13 +26,26 @@
 
         <button type="submit" class="btn btn-primary">Submit</button>
     </EditForm>
-</div>
-
-<div style="text-align:center;">
-    <img style="width:65%;max-width:400px;" src="images/qr-code.svg" />
+    
+    <div style="padding-top: 20px">
+        <button class="btn btn-outline-secondary" @onclick="ShowShare">Share</button>
+        <div style="text-align:center;display:@showShare">
+            <div>
+                <img style="width:65%;max-width:400px;" src="images/qr-code.svg"/>
+            </div>
+            <div>
+                <span>@NavManager.BaseUri</span>
+            </div>
+        </div>
+    </div>
 </div>
 
 @code {
+    [Inject] 
+    public required NavigationManager NavManager { get; set; }
+    
+    [Inject]
+    public required ILocalStorageService LocalStorage { get; set; }
 
     [Parameter]
     public required string Version { get; set; }
@@ -42,23 +53,28 @@
     [Parameter]
     public string? FormData { get; set; }
 
-    private MarkerFormModel _formData = new()
+    private UserFormModel _formData = new()
     {
         Team = Team.None
     };
 
-    public class MarkerFormModel
+    private string showShare = "none";
+
+    private void ShowShare() => showShare = "initial";
+
+    protected override async Task OnInitializedAsync()
     {
-        public const int LabelMaxChars = 28;
-
-        [Required] public Team? Team { get; set; }
-
-        [StringLength(LabelMaxChars, ErrorMessage = "Label must be 28 characters or less.")]
-        public string Label { get; set; } = "";
-
-        [RegularExpression("^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$", ErrorMessage = "Invalid Format")]
-        public string Color { get; set; } = "#000000";
+        await base.OnInitializedAsync();
+        if (await LocalStorage.ContainKeyAsync(nameof(UserStore)))
+        {
+            // If user exists in storage, continue to the map page
+            NavManager.NavigateTo($"/{Version}/map");
+        }
     }
 
-    private void OnSubmit() => NavManager.NavigateTo($"/{Version}/map/{Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(_formData)))}");
+    private async Task OnSubmit()
+    {
+        await LocalStorage.SetItemAsync(nameof(UserStore), _formData.ToUserStore());
+        NavManager.NavigateTo($"/{Version}/map");
+    }
 }
