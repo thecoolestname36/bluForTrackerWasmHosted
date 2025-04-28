@@ -14,7 +14,7 @@
         || !appVersion.StartsWith(clientVersion as string ?? ""))
     {
         Response.Headers.TryAdd("Clear-Site-Data", "cache");
-        Response.Redirect($"/{appVersion}");
+        Response.Redirect($"/{appVersion.Replace('.','_')}");
         return;
     }
 
