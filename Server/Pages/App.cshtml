@@ -7,11 +7,11 @@
 @inject IConfiguration Configuration
 @{
     Layout = null;
-    var appVersion = typeof(App).Assembly.GetName().Version?.ToString() ?? "unk";
+    var appVersion = typeof(App).Assembly.GetName().Version?.ToString() ?? "";
     Request.RouteValues.TryGetValue("clientVersion", out var clientVersion);
     
     if (string.IsNullOrEmpty(clientVersion as string ?? "")
-        || !appVersion.StartsWith(clientVersion as string ?? ""))
+        || !appVersion.Replace('.','_').StartsWith(clientVersion as string ?? ""))
     {
         Response.Headers.TryAdd("Clear-Site-Data", "cache");
         Response.Redirect($"/{appVersion.Replace('.','_')}");
