@@ -1,8 +1,10 @@
 ﻿@page "/map/{version}"
 @using System.Collections.Concurrent
+@using System.Text.Json
 @using Microsoft.AspNetCore.SignalR.Client
 @using Blazored.LocalStorage
 @using BluForTracker.Client.DataModels
+@using BluForTracker.Client.Services
 @using BluForTracker.Shared
 @inject IConfiguration Configuration
 @implements IAsyncDisposable
@@ -10,7 +12,16 @@
 
 <div id="map-page-container">
     <div id="map-menu-container">
-        <button type="button" class="btn btn-danger btn-lg" style="float:right" @onclick="Exit">Exit</button>
+        <button type="button" class="btn btn-warning btn-lg" @onclick="Scrub">Scrub</button>
+        <button
+            type="button"
+            class="btn btn-lg location @(_broadcastingPosition ? "location-on" : "")"
+            @onclick="BroadcastPositionOnClick"
+            disabled="@(!_mapReady)">
+            @(_broadcastingPosition ? "Location(On)" : "Location(Off)")
+        </button>
+        <button type="button" class="btn btn-danger btn-lg" style="float:right" @onclick="Logout">Logout</button>
+
     </div>
     <div id="map-container">
         <div id="map"></div>
@@ -20,43 +31,80 @@
                 <table class="tableScrollable">
                     <thead>
                     <tr>
-                        <th style="width:100px">State</th>
                         <th style="width:160px" >
                             <button class="btn btn-block btn-outline-dark" @onclick="() => SetFrameOnClick(latitude: 40.12, longitude: -100.45, zoom: 4.0)">Username</button>
                         </th>
-                        <th>Message</th>
+                        <th>
+                            <button class="btn btn-block btn-outline-dark" @onclick="() => SetFrameOnClick(latitude: 40.12, longitude: -100.45, zoom: 4.0)">Message</button>
+                        </th>
                     </tr>
                     </thead>
                     <tbody>
-                    @foreach (var item in _markers)
+                    
+                    @{
+                        var listed = new Dictionary<string, (InfoMarker? infoMarker, Marker? marker)>();
+                        @foreach (var infoMarker in _infoMarkers.Values.ToList())
+                        {
+                            listed.Add(infoMarker.Id, (infoMarker, null));
+                        }
+                        @foreach (var marker in _markers.Values.ToList())
+                        {
+                            if (listed.TryGetValue(marker.Id, out var user))
+                            {
+                                listed[marker.Id] = (user.infoMarker, marker);
+                            }
+                            else
+                            {
+                                listed.Add(marker.Id, (null, marker));
+                            }
+                        }
+                    }
+                    @foreach (var user in listed)
                     {
-                        <tr style="cursor:pointer; box-shadow:0px -16px 32px inset @item.Value.Color">
-                            <td style="width:100px">
+                        var labelColor = user.Value.infoMarker?.LabelColor ?? user.Value.marker?.Color ?? "#000";
+                        <tr style="cursor:pointer; box-shadow:0px -16px 32px inset @labelColor">
+                            <td style="width:260px">
                                 @{
-                                    var status = item.Value.Connected ? "Connected" : "Disconnected";
-                                    var diff = DateTimeOffset.UtcNow - item.Value.UpdatedOn;
-                                    if (diff.TotalSeconds < 15)
+                                    if (user.Value.marker is null)
                                     {
-                                        @status
+                                        <button class="btn btn-outline-dark btn-sm btn-block" @onclick="() => SetFrameOnClick(latitude: 40.12, longitude: -100.45, zoom: 4.0)">
+                                            @($"{user.Value.infoMarker?.Label ?? "[No Name]"}: Not Broadcasting")
+                                        </button>
                                     }
                                     else
                                     {
-                                        <button type="button" class="btn btn-danger btn-sm btn-block" @onclick="async () => await RemoveMarker(item.Value.Id)">Stale (@(new DateTime(diff.Ticks).ToString("m:ss")))</button>
+                                        var diff = DateTimeOffset.UtcNow - user.Value.marker.UpdatedOn;
+                                        if (diff.TotalSeconds < 15)
+                                        {
+                                            <button type="button" class="btn btn-outline-dark btn-sm btn-block" @onclick="() => SetFrameOnClick(user.Value.marker)">
+                                                @($"{user.Value.marker.Label}: {(user.Value.marker.Connected ? "Broadcasting" : "Not Broadcasting")}")
+                                            </button>
+                                        }
+                                        else
+                                        {
+                                            <button type="button" class="btn btn-danger btn-sm btn-block" @onclick="async () => await RemoveMarker(user.Key)">
+                                                <span>@($"{user.Value.marker.Label}: Stale > 15s")</span>
+                                            </button>
+                                        }
                                     }
                                 }
                             </td>
-                            <td style="width:160px">
-                                <button class="btn btn-block btn-outline-dark" @onclick="() => SetFrameOnClick(item.Value)">@item.Value.Label</button>
-                            </td>
-                            @if (_infoMarkers.TryGetValue(item.Key, out var infoMarker))
+                        
+                            @if (user.Key == _myInfoMarker?.Id)
                             {
                                 <td>
-                                    <button class="btn btn-block btn-outline-dark" @onclick="() => SetFrameOnClick(infoMarker)">@infoMarker.Message</button>
+                                    <button class="btn btn-outline-dark btn-sm btn-block" @onclick="() => SetFrameOnClick(latitude: 40.12, longitude: -100.45, zoom: 4.0)">
+                                        @(string.IsNullOrEmpty(user.Value.infoMarker?.Message) ? "[No Message]" : user.Value.infoMarker.Message)
+                                    </button>
                                 </td>
                             }
                             else
                             {
-                                <td @onclick="() => SetFrameOnClick(item.Value)"></td>
+                                <td>
+                                    <button class="btn btn-outline-dark btn-sm btn-block" @onclick="() => SetFrameOnClick(user.Value.infoMarker)">
+                                        @(string.IsNullOrEmpty(user.Value.infoMarker?.Message) ? "[No Message]" : user.Value.infoMarker.Message)
+                                    </button>
+                                </td>
                             }
                         </tr>
                     }
@@ -94,6 +142,9 @@
 
     [Inject]
     public required ILocalStorageService LocalStorage { get; set; }
+    
+    [Inject]
+    public required CurrentUserHandler CurrentUserHandler { get; set; }
 
     [Parameter]
     public required string Version { get; set; }
@@ -107,11 +158,13 @@
     IJSObjectReference? _mapModuleJs = default!;
     GeolocationCoordinates? _currentLocation;
     InfoMarker? _myInfoMarker;
-    CurrentUserModel? _currentUser = null;
     HubConnection? _hubConnection;
     ConcurrentDictionary<string, Marker> _markers = new();
     ConcurrentDictionary<string, InfoMarker> _infoMarkers = new();
     CancellationTokenSource _jobTokenSource = new();
+    CancellationTokenSource _sendLocationLoopTokenSource = new();
+    bool _mapReady = false;
+    bool _broadcastingPosition = false;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -121,19 +174,18 @@
         {
             if (string.IsNullOrEmpty(Version)
                 || !await LocalStorage.ContainKeyAsync(nameof(UserStore))
-                || (_currentUser = (await LocalStorage.GetItemAsync<UserStore>(nameof(UserStore)))?.ToCurrentUserModel()) == null)
+                || (CurrentUserHandler.CurrentUser = (await LocalStorage.GetItemAsync<UserStore>(nameof(UserStore)))?.ToCurrentUserModel()) == null)
             {
                 // No user set, redirect to user page
                 NavManager.NavigateTo($"/", true);
             }
             
-            var collocatedJs = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./Pages/Map.razor.js");
+            var collocatedJs = await JSRuntime.InvokeAsync<IJSObjectReference>("import", $"./Pages/Map.razor.js?v={Version}");
             // TODO - Convert this to a JS Interop with JSImport
             _mapModuleJs = await collocatedJs.InvokeAsync<IJSObjectReference>("CreateMapModule");
             await MapLoadLoop();
             await GetHubConnection();
             ViewRenderLoop();
-            SendLocationLoop();
             SendMyInfoMarkerLoop();
         }
     }
@@ -174,16 +226,17 @@
     PeriodicTimer? _sendLocationTimer;
     async Task SendLocationLoop()
     {
-        if (_jobTokenSource.IsCancellationRequested) return;
+        if (_sendLocationLoopTokenSource.IsCancellationRequested) return;
         
         _sendLocationTimer ??= new(TimeSpan.FromMilliseconds(125));
         var sending = false;
 
         try
         {
-            while(await _sendLocationTimer.WaitForNextTickAsync(_jobTokenSource.Token))
+            while(await _sendLocationTimer.WaitForNextTickAsync(_sendLocationLoopTokenSource.Token))
             {
                 if(sending) continue;
+                if (_currentLocation == null) continue;
 
                 var hubConnection = await GetHubConnection();
                 if(hubConnection.State == HubConnectionState.Connected && _currentLocation.HasValue)
@@ -192,9 +245,9 @@
                     {
                         Latitude = _currentLocation.Value.Latitude,
                         Longitude = _currentLocation.Value.Longitude,
-                        Team = _currentUser?.Team ?? Team.None,
-                        Label = _currentUser?.Label ?? "",
-                        Color = _currentUser?.Color ?? "#000000",
+                        Team = CurrentUserHandler.CurrentUser?.Team ?? Team.None,
+                        Label = CurrentUserHandler.CurrentUser?.Label ?? "",
+                        Color = CurrentUserHandler.CurrentUser?.Color ?? "#000000",
                         Connected = true
                     };
                     _currentLocation = null;
@@ -223,7 +276,7 @@
                 {
                     var infoMarker = new InfoMarker
                     {
-                        Team = _currentUser?.Team ?? Team.None,
+                        Team = CurrentUserHandler.CurrentUser?.Team ?? Team.None,
                         Label = _myInfoMarker.Label,
                         LabelColor = _myInfoMarker.LabelColor,
                         Message = _myInfoMarker.Message,
@@ -239,6 +292,34 @@
         } catch {}
     }
 
+    private bool _broadcastPositionOnClick = false;
+    private async Task BroadcastPositionOnClick()
+    {
+        if (_broadcastPositionOnClick) return;
+        _broadcastPositionOnClick = true;
+        await _mapModuleJs.InvokeVoidAsync("watchPosition");
+        if (_broadcastingPosition == false)
+        {
+            _broadcastingPosition = true;
+            _sendLocationLoopTokenSource = new CancellationTokenSource();
+            SendLocationLoop();
+        }
+        else
+        {
+            await _mapModuleJs.InvokeVoidAsync("watchPositionStop");
+            await _sendLocationLoopTokenSource.CancelAsync();
+            _broadcastingPosition = false;
+        }
+
+        _broadcastPositionOnClick = false;
+    }
+
+    [JSInvokable]
+    public void OnMapIdle()
+    {
+        _mapReady = true;
+    }
+
     [JSInvokable]
     public void UpdateCurrentPosition(double lat, double lng) => _currentLocation = new GeolocationCoordinates
         {
@@ -247,14 +328,11 @@
         };
 
     [JSInvokable]
-    public void UpdateCurrentPositionError() => NavManager.NavigateTo($"/", true);
-
-    [JSInvokable]
     public void UpdateMyInfoMarker(string message, double lat, double lng) => _myInfoMarker = new InfoMarker()
         {
-            Team = _currentUser?.Team ?? Team.None,
-            Label = _currentUser?.Label ?? "unk",
-            LabelColor = _currentUser?.Color ?? "#000000",
+            Team = CurrentUserHandler.CurrentUser?.Team ?? Team.None,
+            Label = CurrentUserHandler.CurrentUser?.Label ?? "unk",
+            LabelColor = CurrentUserHandler.CurrentUser?.Color ?? "#000000",
             Message = string.IsNullOrEmpty(message) ? "" : message,
             Latitude = lat,
             Longitude = lng
@@ -279,21 +357,35 @@
         }
     }
 
-    async Task Exit()
+    async Task Scrub()
+    {
+        var hubConnection = await GetHubConnection();
+        if(hubConnection.State == HubConnectionState.Connected)
+        {
+            await hubConnection.SendAsync(Routing.MarkerHub.Server.Exit);
+        }
+    }
+
+    async Task Logout()
     {
         var hubConnection = await GetHubConnection();
         if(hubConnection.State == HubConnectionState.Connected)
         {
             await _jobTokenSource.CancelAsync();
+            await _sendLocationLoopTokenSource.CancelAsync();
             await hubConnection.SendAsync(Routing.MarkerHub.Server.Exit);
             await LocalStorage.ClearAsync();
             NavManager.NavigateTo($"/", true);
         }
     }
 
-    Task SetFrameOnClick(Marker marker) => SetFrameOnClick(marker.Latitude, marker.Longitude);
-    
-    Task SetFrameOnClick(InfoMarker marker) => SetFrameOnClick(marker.Latitude, marker.Longitude);
+    Task SetFrameOnClick(Marker? marker) => marker == null 
+        ? Task.CompletedTask
+        : SetFrameOnClick(marker.Latitude, marker.Longitude);
+
+    Task SetFrameOnClick(InfoMarker? infoMarker) => infoMarker == null 
+        ? Task.CompletedTask 
+        : SetFrameOnClick(infoMarker.Latitude, infoMarker.Longitude);
 
     Task SetFrameOnClick(double latitude, double longitude, double zoom = 16.0) => Task.WhenAll([
         _mapModuleJs?.InvokeVoidAsync("setCenter", latitude, longitude).AsTask() ?? Task.CompletedTask,
@@ -319,7 +411,7 @@
                     var hubConnection = await GetHubConnection();
                     if (hubConnection.State == HubConnectionState.Connected)
                     {
-                        await hubConnection.SendAsync(Routing.MarkerHub.Server.UpdateConnectionId, oldConnectionId, _currentUser?.Team ?? Team.None, _currentUser?.Color ?? "#000000");
+                        await hubConnection.SendAsync(Routing.MarkerHub.Server.UpdateConnectionId, oldConnectionId, CurrentUserHandler.CurrentUser?.Team ?? Team.None, CurrentUserHandler.CurrentUser?.Color ?? "#000000");
                     }
                 }
                 await LocalStorage.SetItemAsStringAsync("connection_id", connectionId);
@@ -327,13 +419,13 @@
             _hubConnection.On<List<Marker>>(Routing.MarkerHub.Client.SyncMarkers, async (markers) =>
             {
                 _markers = new ConcurrentDictionary<string, Marker>(
-                    markers.Where(marker => marker.Team == _currentUser?.Team).Select(marker => new KeyValuePair<string, Marker>(marker.Id, marker)));
+                    markers.Where(marker => marker.Team == CurrentUserHandler.CurrentUser?.Team).Select(marker => new KeyValuePair<string, Marker>(marker.Id, marker)));
                 StateHasChanged();
                 await _mapModuleJs.InvokeVoidAsync("syncMarkers", _markers.Values.ToList());
             });
             _hubConnection.On<Marker>(Routing.MarkerHub.Client.ReceiveMarker, async (marker) =>
             {
-                if (marker.Team == _currentUser?.Team)
+                if (marker.Team == CurrentUserHandler.CurrentUser?.Team)
                 {
                     _markers[marker.Id] = marker;
                     StateHasChanged();
@@ -357,14 +449,14 @@
 
             _hubConnection.On<List<InfoMarker>>(Routing.MarkerHub.Client.SyncInfoMarkers, async (infoMarkers) =>
             {
-                var list = infoMarkers.Where(infoMarker => infoMarker.Team == _currentUser?.Team).ToList();
+                var list = infoMarkers.Where(infoMarker => infoMarker.Team == CurrentUserHandler.CurrentUser?.Team).ToList();
                 _infoMarkers.Clear();
                 list.ForEach(m => _infoMarkers.TryAdd(m.Id, m));
                 await _mapModuleJs.InvokeVoidAsync("syncInfoMarkers", list);
             });
             _hubConnection.On<InfoMarker>(Routing.MarkerHub.Client.ReceiveInfoMarker, async (infoMarker) =>
             {
-                if (infoMarker.Team == _currentUser?.Team)
+                if (infoMarker.Team == CurrentUserHandler.CurrentUser?.Team)
                 {
                     _infoMarkers.AddOrUpdate(infoMarker.Id, infoMarker, (key, value) => infoMarker);
                     await _mapModuleJs.InvokeVoidAsync("receiveInfoMarker", infoMarker);
@@ -390,12 +482,13 @@
         try
         {
             await _jobTokenSource.CancelAsync();
+            await _sendLocationLoopTokenSource.CancelAsync();
         }
         catch { }
         
         _markers.Clear();
         _currentLocation = null;
-        _currentUser = null;
+        await CurrentUserHandler.DisposeAsync();
         if(_hubConnection != null)
         {
             await _hubConnection.StopAsync();

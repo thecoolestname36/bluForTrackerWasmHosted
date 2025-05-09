@@ -119,3 +119,14 @@ tr:nth-child(even) {
     }
 }
 
+.btn:focus {
+    box-shadow:none;
+}
+
+.btn.location {
+    border: 1px solid black;
+}
+
+.btn.location-on {
+    background-color: #20c93b;
+}

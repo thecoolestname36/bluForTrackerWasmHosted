@@ -65,10 +65,9 @@
     protected override async Task OnInitializedAsync()
     {
         await base.OnInitializedAsync();
-        if (await LocalStorage.ContainKeyAsync(nameof(UserStore)))
+        if(await LocalStorage.GetItemAsync<UserStore>(nameof(UserStore)) is {} userStore)
         {
-            // If user exists in storage, continue to the map page
-            NavManager.NavigateTo($"/map/{Version.Replace('.','_')}");
+            _formData = userStore.ToUserFormModel();
         }
     }
 

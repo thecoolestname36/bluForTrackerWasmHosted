@@ -31,7 +31,10 @@ export class MapModule {
             delete this.infoMarkers[i];
         }
         window.mapModule.map.addListener("click", (mapsMouseEvent) => this.googleMapClickListener(mapsMouseEvent));
-        google.maps.event.addListenerOnce(window.mapModule.map, 'idle', () => this.watchPosition());
+        google.maps.event.addListenerOnce(window.mapModule.map, 'idle', () => this.onMapIdle());
+    }
+    onMapIdle() {
+        this.dotNetReference.invokeMethodAsync("OnMapIdle");
     }
     watchPositionSuccess(position) {
         //console.info("watchPositionSuccess", position);
@@ -47,23 +50,30 @@ export class MapModule {
         navigator.geolocation.clearWatch(window.mapModule.positionWatch);
         if(error.code == GeolocationPositionError.PERMISSION_DENIED) {
             alert("Location permission denied. Please allow location access.");
-            this.dotNetReference.invokeMethodAsync("UpdateCurrentPositionError");
+            location.reload();
             return;
         }
-        this.watchPosition();
+        alert(error.message);
     }
     watchPosition() {
-        //console.info("watchPosition");
+        console.info("watchPosition");
         this.loadingState = -1;
         this.firstLoad = true;
         if(window.mapModule.positionWatch != null) {
             navigator.geolocation.clearWatch(window.mapModule.positionWatch);
         }
         window.mapModule.positionWatch = navigator.geolocation.watchPosition(
-            (position) => this.watchPositionSuccess(position),
-            (error) => this.watchPositionError(error), {
-            enableHighAccuracy: true
-        });
+            position => this.watchPositionSuccess(position),
+            error => this.watchPositionError(error), 
+            {
+                enableHighAccuracy: false
+            });
+    }
+    watchPositionStop() {
+        console.info("watchPositionStop");
+        if(window.mapModule.positionWatch != null) {
+            navigator.geolocation.clearWatch(window.mapModule.positionWatch);
+        }
     }
     syncMarkers(newMarkers) {
         //console.info("syncMarkers", newMarkers);
