@@ -1,4 +1,4 @@
-﻿@page "/{version}"
+﻿@page "/form"
 @using Microsoft.AspNetCore.Components.Forms
 @using Blazored.LocalStorage
 @using BluForTracker.Shared
@@ -48,9 +48,6 @@
     public required ILocalStorageService LocalStorage { get; set; }
 
     [Parameter]
-    public required string Version { get; set; }
-
-    [Parameter]
     public string? FormData { get; set; }
 
     private UserFormModel _formData = new()
@@ -65,7 +62,7 @@
     protected override async Task OnInitializedAsync()
     {
         await base.OnInitializedAsync();
-        if(await LocalStorage.GetItemAsync<UserStore>(nameof(UserStore)) is {} userStore)
+        if(await LocalStorage.GetItemAsync<UserStore>(UserStore.StorageKey) is {} userStore)
         {
             _formData = userStore.ToUserFormModel();
         }
@@ -73,7 +70,7 @@
 
     private async Task OnSubmit()
     {
-        await LocalStorage.SetItemAsync(nameof(UserStore), _formData.ToUserStore());
-        NavManager.NavigateTo($"/map/{Version.Replace('.','_')}");
+        await LocalStorage.SetItemAsync(UserStore.StorageKey, _formData.ToUserStore());
+        NavManager.NavigateTo($"/", true);
     }
 }
