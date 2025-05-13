@@ -1,31 +1,26 @@
-﻿@page "/{clientVersion?}"
+﻿@page "/{clearCache?}"
 @namespace BluForTracker.Server.Pages
 @using Microsoft.AspNetCore.Components.Web
-@using Microsoft.Extensions.Configuration
 @using BluForTracker.Client
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
-@inject IConfiguration Configuration
 @{
     Layout = null;
-    var appVersion = typeof(App).Assembly.GetName().Version?.ToString() ?? "";
-    Request.RouteValues.TryGetValue("clientVersion", out var clientVersion);
-    
-    if (string.IsNullOrEmpty(clientVersion as string ?? "")
-        || !appVersion.Replace('.','_').StartsWith(clientVersion as string ?? ""))
+    var appVersion = typeof(App).Assembly.GetName().Version?.ToString() ?? DateTime.UtcNow.Ticks.ToString();
+
+    if (Request.RouteValues.TryGetValue("clearCache", out var c)
+        && c is string clearCache
+        && !string.IsNullOrEmpty(clearCache)
+        && clearCache == "clearCache")
     {
-        Response.Headers.TryAdd("Clear-Site-Data", "cache");
-        Response.Redirect($"/{appVersion.Replace('.','_')}");
+        Response.Headers.TryAdd("Clear-Site-Data", "\"cache\"");
+        Response.Redirect("/");
         return;
     }
-
-    var googleMapsApiKey = Configuration.GetValue<string>("GoogleMapsApiKey");
 }
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
-    <meta http-equiv="Cache-control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BluForTracker</title>
@@ -61,7 +56,7 @@
         };
     </script>
 <component type="typeof(HeadOutlet)" render-mode="WebAssembly" />
-<script>navigator.serviceWorker.register('service-worker.js?v=@appVersion', { updateViaCache: 'none' });</script>
+<script>navigator.serviceWorker.register('service-worker.js?v=@appVersion');</script>
 </body>
 
 </html>

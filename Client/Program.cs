@@ -9,8 +9,10 @@ builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
 builder.Services.AddBlazoredLocalStorageAsSingleton();
-builder.Services.AddHttpClient("BluForTracker.ServerAPI", client => client.BaseAddress = new Uri(builder.HostEnvironment.BaseAddress));
-builder.Services.AddSingleton(sp => sp.GetRequiredService<IHttpClientFactory>().CreateClient("BluForTracker.ServerAPI"));
 builder.Services.AddSingleton<CurrentUserHandler>();
+builder.Services.AddHttpClient<BluForTrackerApiService>(client =>
+{
+    client.BaseAddress = new Uri(builder.HostEnvironment.BaseAddress + "api/");
+});
 
 await builder.Build().RunAsync();

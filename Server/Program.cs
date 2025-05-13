@@ -1,3 +1,5 @@
+using BluForTracker.Client;
+using BluForTracker.Client.Services;
 using Microsoft.AspNetCore.ResponseCompression;
 using BluForTracker.Shared;
 using BluForTracker.Server;
@@ -25,7 +27,10 @@ if(app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-//app.UseHttpsRedirection();
+// if (!app.Environment.IsDevelopment())
+// {
+//     app.UseHttpsRedirection();   
+// }
 app.UseBlazorFrameworkFiles();
 app.UseStaticFiles();
 
@@ -34,5 +39,8 @@ app.UseRouting();
 app.MapRazorPages();
 app.MapHub<MarkerHub>(Routing.MarkerHub.Path);
 app.MapFallbackToPage("/App");
+
+// Minimal API
+app.MapGet($"/{BluForTrackerApiService.BasePath}/{nameof(BluForTrackerApiService.CurrentVersion)}", () => typeof(App).Assembly.GetName().Version?.ToString() ?? DateTime.UtcNow.Ticks.ToString());
 
 app.Run();
