@@ -1,0 +1,14 @@
+{
+  "name": "npm",
+  "version": "1.0.0",
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "main": "webpack.config.js",
+  "dependencies": {
+    "webpack": "^5.97.1"
+  },
+  "scripts": {
+    "build": "webpack"
+  }
+}

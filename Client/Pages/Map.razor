@@ -1,8 +1,9 @@
 ﻿@page "/"
 @using System.Collections.Concurrent
+@using System.Text.Json
 @using Microsoft.AspNetCore.SignalR.Client
-@using Blazored.LocalStorage
 @using BluForTracker.Client.DataModels
+@using BluForTracker.Client.Interops
 @using BluForTracker.Client.Services
 @using BluForTracker.Shared
 @inject IConfiguration Configuration
@@ -142,7 +143,7 @@
     public required IJSRuntime JsRuntime { get; set; }
 
     [Inject]
-    public required ILocalStorageService LocalStorage { get; set; }
+    public required GoogleMapsInterop GoogleMapsInterop { get; set; }
     
     [Inject]
     public required CurrentUserHandler CurrentUserHandler { get; set; }
@@ -174,11 +175,9 @@
         if(firstRender)
         {
             _currentVersion = await HandleVersionCheck();
-            await SetUserOrRedirect();
-            
-            var collocatedJs = await JsRuntime.InvokeAsync<IJSObjectReference>("import", $"./Pages/Map.razor.js?v={_currentVersion}");
-            // TODO - Convert this to a JS Interop with JSImport
-            _mapModuleJs = await collocatedJs.InvokeAsync<IJSObjectReference>("CreateMapModule");
+            SetUserOrRedirect();
+
+            _mapModuleJs = await GoogleMapsInterop.CreateObject();
             await MapLoadLoop();
             await GetHubConnection();
             _viewRenderLoopTask = ViewRenderLoop();
@@ -190,25 +189,27 @@
     {
         const string clientVersion = "client_version";
         var currentVersionTask = ApiService.CurrentVersion();
-        var currentClientVersion = await LocalStorage.GetItemAsStringAsync(clientVersion);
+        var currentClientVersion = LocalStorageInterop.GetItem(clientVersion);
         var currentVersion = await currentVersionTask;
         if (!string.IsNullOrEmpty(currentClientVersion) && currentClientVersion != currentVersion)
         {
-            await LocalStorage.RemoveItemAsync(clientVersion);
+            LocalStorageInterop.RemoveItem(clientVersion);
             await JsRuntime.InvokeVoidAsync("alert", "New version available!\nClick OK to update.");
             NavManager.NavigateTo($"/clearCache", true);
         }
-        await LocalStorage.SetItemAsStringAsync(clientVersion, currentVersion);
+        LocalStorageInterop.SetItem(clientVersion, currentVersion);
         return currentVersion;
     }
 
-    private async Task SetUserOrRedirect()
+    private void SetUserOrRedirect()
     {
-        if (!await LocalStorage.ContainKeyAsync(UserStore.StorageKey)
-            || (CurrentUserHandler.CurrentUser = (await LocalStorage.GetItemAsync<UserStore>(UserStore.StorageKey))?.ToCurrentUserModel()) == null)
+        if (LocalStorageInterop.GetItem(UserStore.StorageKey) is {} storeValue && JsonSerializer.Deserialize<UserStore>(storeValue) is {} userStore)
         {
-            NavManager.NavigateTo($"/form"); 
+            CurrentUserHandler.CurrentUser = userStore.ToCurrentUserModel();
+            return;
         }
+        // No user
+        NavManager.NavigateTo($"/form"); 
     }
 
     PeriodicTimer? _mapLoadTimer;
@@ -395,7 +396,7 @@
             await _jobTokenSource.CancelAsync();
             await _sendLocationLoopTokenSource.CancelAsync();
             await hubConnection.SendAsync(Routing.MarkerHub.Server.Exit);
-            await LocalStorage.ClearAsync();
+            LocalStorageInterop.Clear();
             NavManager.NavigateTo($"/form");
         }
     }
@@ -426,7 +427,7 @@
             _hubConnection.KeepAliveInterval = TimeSpan.FromSeconds(5);
             _hubConnection.On<string>(Routing.MarkerHub.Client.ReceiveConnectionId, async (connectionId) =>
             {
-                var oldConnectionId = await LocalStorage.GetItemAsStringAsync("connection_id");
+                var oldConnectionId = LocalStorageInterop.GetItem("connection_id");
                 if (!string.IsNullOrEmpty(oldConnectionId))
                 {
                     var hubConnection = await GetHubConnection();
@@ -435,7 +436,7 @@
                         await hubConnection.SendAsync(Routing.MarkerHub.Server.UpdateConnectionId, oldConnectionId, CurrentUserHandler.CurrentUser?.Team ?? Team.None, CurrentUserHandler.CurrentUser?.Color ?? "#000000");
                     }
                 }
-                await LocalStorage.SetItemAsStringAsync("connection_id", connectionId);
+                LocalStorageInterop.SetItem("connection_id", connectionId);
             });
             _hubConnection.On<List<Marker>>(Routing.MarkerHub.Client.SyncMarkers, async (markers) =>
             {

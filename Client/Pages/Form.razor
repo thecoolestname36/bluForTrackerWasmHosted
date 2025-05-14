@@ -1,15 +1,16 @@
 ﻿@page "/form"
+@using System.Text.Json
 @using Microsoft.AspNetCore.Components.Forms
-@using Blazored.LocalStorage
 @using BluForTracker.Shared
 @using BluForTracker.Client.DataModels
+@using BluForTracker.Client.Interops
 
 <PageTitle>User Form</PageTitle>
 
 <div class="container">
     <h2>User Form</h2>
 
-    <EditForm Model="@_formData" OnValidSubmit="async () => await OnSubmit()">
+    <EditForm Model="@_formData" OnValidSubmit="OnSubmit">
         <DataAnnotationsValidator />
         <ValidationSummary />
 
@@ -43,9 +44,6 @@
 @code {
     [Inject] 
     public required NavigationManager NavManager { get; set; }
-    
-    [Inject]
-    public required ILocalStorageService LocalStorage { get; set; }
 
     [Parameter]
     public string? FormData { get; set; }
@@ -62,15 +60,15 @@
     protected override async Task OnInitializedAsync()
     {
         await base.OnInitializedAsync();
-        if(await LocalStorage.GetItemAsync<UserStore>(UserStore.StorageKey) is {} userStore)
+        if(LocalStorageInterop.GetItem(UserStore.StorageKey) is {} storeValue&& JsonSerializer.Deserialize<UserStore>(storeValue) is {} userStore)
         {
             _formData = userStore.ToUserFormModel();
         }
     }
 
-    private async Task OnSubmit()
+    private void OnSubmit()
     {
-        await LocalStorage.SetItemAsync(UserStore.StorageKey, _formData.ToUserStore());
+        LocalStorageInterop.SetItem(UserStore.StorageKey, JsonSerializer.Serialize(_formData.ToUserStore()));
         NavManager.NavigateTo($"/", true);
     }
 }
