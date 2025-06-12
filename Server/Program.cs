@@ -1,5 +1,3 @@
-using BluForTracker.Client;
-using BluForTracker.Client.Services;
 using Microsoft.AspNetCore.ResponseCompression;
 using BluForTracker.Shared;
 using BluForTracker.Server;
@@ -12,6 +10,16 @@ builder.Services.AddResponseCompression(opts =>
 {
     opts.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(
           new[] { "application/octet-stream" });
+});
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowBlazor", policy =>
+    {
+        policy.WithOrigins("https://localhost:7095")  // Your Blazor app URL -- TODO figure out 
+            .AllowAnyMethod()
+            .AllowAnyHeader();
+    });
 });
 
 var app = builder.Build();
@@ -35,12 +43,11 @@ app.UseBlazorFrameworkFiles();
 app.UseStaticFiles();
 
 app.UseRouting();
+app.UseCors("AllowBlazor");
 
-app.MapRazorPages();
 app.MapHub<MarkerHub>(Routing.MarkerHub.Path);
-app.MapFallbackToPage("/App");
 
 // Minimal API
-app.MapGet($"/{BluForTrackerApiService.BasePath}/{nameof(BluForTrackerApiService.CurrentVersion)}", () => typeof(App).Assembly.GetName().Version?.ToString() ?? DateTime.UtcNow.Ticks.ToString());
+app.MapGet($"/api/CurrentVersion", () => typeof(Program).Assembly.GetName().Version?.ToString() ?? DateTime.UtcNow.Ticks.ToString());
 
 app.Run();

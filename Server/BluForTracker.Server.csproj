@@ -7,11 +7,6 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyVersion>1.26</AssemblyVersion>
   </PropertyGroup>
-
-  <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
-    <Exec Command="npm install" WorkingDirectory="npm" />
-    <Exec Command="npm run build" WorkingDirectory="npm" />
-  </Target>
   
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="8.0.15" />
@@ -19,12 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Client\BluForTracker.Client.csproj" />
     <ProjectReference Include="..\Shared\BluForTracker.Shared.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="wwwroot\" />
   </ItemGroup>
 
 </Project>

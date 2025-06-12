@@ -6,6 +6,7 @@
 @using BluForTracker.Client.Interops
 @using BluForTracker.Client.Services
 @using BluForTracker.Shared
+@using Microsoft.Extensions.Options
 @inject IConfiguration Configuration
 @implements IAsyncDisposable
 <PageTitle>Map @_currentVersion</PageTitle>
@@ -133,6 +134,9 @@
 <script async src="https://maps.googleapis.com/maps/api/js?key=@(Configuration.GetValue<string>("GoogleMapsApiKey"))&loading=async&callback=window.mapModule.mapsCallback&libraries=maps,marker"></script>
 
 @code {
+    [Inject]
+    public required IOptions<AppSettings> AppSettings { get; set; }
+    
     [Inject]
     public required BluForTrackerApiService ApiService { get; set; }
     
@@ -418,7 +422,7 @@
     {
         if (_hubConnection == null)
         {
-            var builder = new UriBuilder(NavManager.BaseUri);
+            var builder = new UriBuilder(AppSettings.Value.ApiHost);
             builder.Path += Routing.MarkerHub.Path;
             _hubConnection = new HubConnectionBuilder()
                 .WithUrl(builder.Uri)
