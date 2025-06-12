@@ -18,7 +18,7 @@ else
 builder.Services.AddSingleton<CurrentUserHandler>();
 builder.Services.AddHttpClient<BluForTrackerApiService>(client =>
 {
-    client.BaseAddress = new Uri(builder.HostEnvironment.BaseAddress + "api/");
+    client.BaseAddress = new Uri("https://blufortracker.sradzone.com/api/");
 });
 
 await builder.Build().RunAsync();
