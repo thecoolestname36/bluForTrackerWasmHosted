@@ -130,3 +130,22 @@ tr:nth-child(even) {
 .btn.location-on {
     background-color: #20c93b;
 }
+
+.linear-progress {
+    background: #e1e1e1;
+    width: 100vw;
+    margin: 0% auto;
+    height: 1rem;
+    overflow: hidden;
+    position: relative;
+}
+
+.linear-progress:after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: #737373;
+    scale: var(--blazor-load-percentage, 0%) 100%;
+    transform-origin: left top;
+    transition: scale ease-out 0.5s;
+}
