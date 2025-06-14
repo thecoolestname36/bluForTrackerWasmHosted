@@ -16,7 +16,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowBlazor", policy =>
     {
-        policy.WithOrigins("https://localhost:7095")  // Your Blazor app URL -- TODO figure out 
+        policy.WithOrigins("https://localhost:7095", "https://blufortrackerwasmhosted.pages.dev")  // Your Blazor app URL -- TODO figure out 
             .AllowAnyMethod()
             .AllowAnyHeader();
     });
